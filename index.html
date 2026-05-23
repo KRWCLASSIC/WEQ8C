@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>weq8</title>
     <script type="module" src="/src/ui/index.ts"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap" rel="stylesheet">
     <style type="text/css">
       body {
         background-color: #555;
@@ -23,6 +24,26 @@
         max-width: 800px;
         margin: 0 auto;
       }
+      .cssInject {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 20px auto;
+        max-width: 500px;
+        gap: 10px;
+      }
+      .cssInject textarea {
+        width: 100%;
+        height: 100px;
+        background: #333;
+        color: white;
+        border: 1px solid #777;
+        padding: 8px;
+        font-family: monospace;
+      }
+      .cssInject button {
+        margin: 0;
+      }
     </style>
   </head>
   <body>
@@ -34,13 +55,46 @@
       >
       <label><input type="radio" name="view" value="hud" /> HUD</label>
     </div>
-    <weq8-ui view="allBands" />
+    <div class="cssInject">
+      <h3>Inject Custom CSS</h3>
+      <textarea id="cssInput" placeholder="Click 'Load Example' or type here..."></textarea>
+      <div style="display: flex; gap: 10px;">
+        <button id="loadExampleBtn">Load Example</button>
+        <button id="injectBtn">Save CSS & Reload</button>
+      </div>
+    </div>
+    
+    <div id="eqContainer"></div>
     <script type="module">
       import { WEQ8Runtime } from "/src/main.ts";
+      import { WEQ8UIElement, EQUIFilterRowElement } from "/src/ui/index.ts";
+
+      const savedCss = localStorage.getItem("weq8c_custom_css");
+      if (savedCss) {
+        document.getElementById("cssInput").value = savedCss;
+        WEQ8UIElement.addCustomStyles(savedCss);
+        EQUIFilterRowElement.addCustomStyles(savedCss);
+      }
+
+      document.getElementById("injectBtn").addEventListener("click", () => {
+        const css = document.getElementById("cssInput").value;
+        localStorage.setItem("weq8c_custom_css", css);
+        window.location.reload();
+      });
+
+      document.getElementById("loadExampleBtn").addEventListener("click", () => {
+        document.getElementById("cssInput").value = `.filter-handle {\n  background: #ff0055 !important;\n  color: white !important;\n}\n.filter-handle.selected {\n  background: #00ffcc !important;\n}`;
+      });
 
       let audioctx = new AudioContext();
       let runtime = new WEQ8Runtime(audioctx);
       runtime.connect(audioctx.destination);
+
+      // 3. NOW instantiate the component, so it picks up the new static styles
+      const uiElement = document.createElement("weq8-ui");
+      uiElement.setAttribute("view", "allBands");
+      uiElement.runtime = runtime;
+      document.getElementById("eqContainer").appendChild(uiElement);
 
       fetch("/testloop.m4a")
         .then((res) => res.arrayBuffer())
@@ -64,11 +118,9 @@
             }
           });
         });
-      document.querySelector("weq8-ui").runtime = runtime;
-
       document.querySelectorAll("input[name=view]").forEach((el) =>
         el.addEventListener("change", (e) => {
-          document.querySelector("weq8-ui").view = e.target.value;
+          document.querySelector("weq8-ui").setAttribute("view", e.target.value);
         })
       );
     </script>
