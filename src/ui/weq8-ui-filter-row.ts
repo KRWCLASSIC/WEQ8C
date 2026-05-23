@@ -101,6 +101,10 @@ export class EQUIFilterRowElement extends LitElement {
         font-size: var(--font-size);
         font-weight: var(--font-weight);
       }
+      .filterTypeSelect option {
+        background-color: #202020;
+        color: white;
+      }
       .filterTypeSelect.bypassed {
         color: #7d7d7d;
       }
@@ -152,6 +156,10 @@ export class EQUIFilterRowElement extends LitElement {
       this.styles = [this.styles as any, newStyle];
     } else {
       this.styles = [newStyle];
+    }
+    // Force Lit to re-evaluate elementStyles for all new instances
+    if ((this as any).finalizeStyles) {
+      this.elementStyles = (this as any).finalizeStyles(this.styles);
     }
   }
 
