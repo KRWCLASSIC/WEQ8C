@@ -94,6 +94,32 @@ When initialising the runtime on a subsequent load, you may provide a previous s
 let weq8 = new WEQ8Runtime(yourAudioCtx, state);
 ```
 
+## Custom CSS Injection (WEQ8C Exclusive)
+
+WEQ8C (WEQ8 fork) introduces a native API for injecting custom CSS directly into the Web Components' internal Shadow DOM. This allows you to safely theme the equalizer without hacky DOM workarounds.
+
+To apply custom styles, use the static `addCustomStyles(cssString)` method on the UI components. It's best to do this **before** or right as you instantiate the UI:
+
+```ts
+import { WEQ8UIElement, EQUIFilterRowElement } from "weq8c/ui";
+
+const customCss = `
+  .filter-handle {
+    background: #ff0055 !important;
+    color: white !important;
+  }
+  .filter-handle.selected {
+    background: #00ffcc !important;
+  }
+`;
+
+// Injects the CSS directly into the constructable stylesheets
+WEQ8UIElement.addCustomStyles(customCss);
+EQUIFilterRowElement.addCustomStyles(customCss);
+```
+
+Note: Calling this method forces the internal rendering engine to completely re-evaluate its cached stylesheets, so it will correctly apply to all newly created instances of the equalizer.
+
 ## Development
 
 Run `npm run dev` and open your browser in [http://localhost:3000](http://localhost:3000) to get a development page with live reloading.
