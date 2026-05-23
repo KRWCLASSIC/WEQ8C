@@ -123,6 +123,10 @@ export class WEQ8UIElement extends LitElement {
     } else {
       this.styles = [newStyle];
     }
+    // Force Lit to re-evaluate elementStyles for all new instances
+    if ((this as any).finalizeStyles) {
+      this.elementStyles = (this as any).finalizeStyles(this.styles);
+    }
   }
 
   constructor() {

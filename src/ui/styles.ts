@@ -1,8 +1,6 @@
 import { css } from "lit";
 
 export const sharedStyles = css`
-  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap");
-
   *,
   *::before,
   *::after {
