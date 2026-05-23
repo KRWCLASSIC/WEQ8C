@@ -1,10 +1,10 @@
 {
-  "name": "weq8",
-  "version": "0.2.2",
+  "name": "weq8c",
+  "version": "0.2.3",
   "type": "module",
   "license": "ISC",
-  "homepage": "https://github.com/teropa/weq8",
-  "repository": "teropa/weq8",
+  "homepage": "https://github.com/KRWCLASSIC/WEQ8C",
+  "repository": "KRWCLASSIC/WEQ8C",
   "author": {
     "name": "Tero Parviainen",
     "email": "tero@teropa.info",

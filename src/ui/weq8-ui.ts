@@ -1,4 +1,4 @@
-import { LitElement, html, css, svg, ReactiveElement } from "lit";
+import { LitElement, html, css, svg, ReactiveElement, unsafeCSS } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { WEQ8Runtime } from "../runtime";
@@ -113,6 +113,17 @@ export class WEQ8UIElement extends LitElement {
       }
     `,
   ];
+
+  static addCustomStyles(cssString: string) {
+    const newStyle = unsafeCSS(cssString);
+    if (Array.isArray(this.styles)) {
+      this.styles = [...this.styles, newStyle];
+    } else if (this.styles) {
+      this.styles = [this.styles as any, newStyle];
+    } else {
+      this.styles = [newStyle];
+    }
+  }
 
   constructor() {
     super();

@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, unsafeCSS } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { WEQ8Runtime } from "../runtime";
@@ -143,6 +143,17 @@ export class EQUIFilterRowElement extends LitElement {
       }
     `,
   ];
+
+  static addCustomStyles(cssString: string) {
+    const newStyle = unsafeCSS(cssString);
+    if (Array.isArray(this.styles)) {
+      this.styles = [...this.styles, newStyle];
+    } else if (this.styles) {
+      this.styles = [this.styles as any, newStyle];
+    } else {
+      this.styles = [newStyle];
+    }
+  }
 
   constructor() {
     super();
