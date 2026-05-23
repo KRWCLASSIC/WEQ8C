@@ -6,9 +6,7 @@
   "homepage": "https://github.com/KRWCLASSIC/WEQ8C",
   "repository": "KRWCLASSIC/WEQ8C",
   "author": {
-    "name": "Tero Parviainen",
-    "email": "tero@teropa.info",
-    "url": "https://teropa.info/"
+    "name": "krwclassic"
   },
   "exports": {
     ".": {

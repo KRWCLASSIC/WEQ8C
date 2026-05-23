@@ -1,12 +1,12 @@
-# weq8
+# weq8c
 
-[![NPM](https://nodei.co/npm/weq8.png?compact=true)](https://npmjs.org/package/weq8)
+[![NPM](https://nodei.co/npm/weq8c.png?compact=true)](https://npmjs.org/package/weq8c)
 
 A parametric equaliser for Web Audio.
 
-![weq8 screenshot](https://raw.githubusercontent.com/teropa/weq8/master/screenshot.png)
+![weq8 screenshot](https://raw.githubusercontent.com/KRWCLASSIC/WEQ8C/master/screenshot.png)
 
-Try the [live demo](https://teropa.github.io/weq8/).
+Try the [live demo](https://KRWCLASSIC.github.io/WEQ8C/).
 
 Sculpt the spectrum of your Web Audio graph using a filter bank of up to eight filters, with an intuitive UI inspired by Ableton Live's [EQ Eight](https://www.ableton.com/en/manual/live-audio-effect-reference/#24-15-eq-eight).
 
@@ -21,9 +21,9 @@ Sculpt the spectrum of your Web Audio graph using a filter bank of up to eight f
 As an NPM package:
 
 ```bash
-yarn add weq8
+yarn add weq8c
 # or
-npm install weq8
+npm install weq8c
 ```
 
 ### Setup and Connect The Runtime
@@ -31,7 +31,7 @@ npm install weq8
 The audio processing of the equaliser all happens in an instance of the `WEQ8Runtime` class. You'll need to import it, initialise it using your [AudioContext](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext), and connect it to the signal path of the audio source you wish to equalise:
 
 ```ts
-import { WEQ8Runtime } from "weq8"; // or from "https://cdn.skypack.dev/weq8"
+import { WEQ8Runtime } from "weq8c"; // or from "https://cdn.skypack.dev/weq8c"
 
 let weq8 = new WEQ8Runtime(yourAudioCtx);
 yourAudioSourceNode.connect(weq8.input);
@@ -43,7 +43,7 @@ weq8.connect(yourAudioDestinationNode);
 The user interface for the equaliser is provided by a [Web Component](https://developer.mozilla.org/en-US/docs/Web/Web_Components) called `<weq8-ui />`. First import the UI module so that this web component gets registered:
 
 ```ts
-import "weq8/ui"; // or "https://cdn.skypack.dev/weq8/ui"
+import "weq8c/ui"; // or "https://cdn.skypack.dev/weq8c/ui"
 ```
 
 Then in your HTML, where you want the equaliser UI to appear, add the element:
@@ -64,7 +64,7 @@ You should see the fully functional UI appear on your page.
 
 You can also control the EQ runtime directly with JavaScript. This is useful if you have some alternative UI controls you wish to use, or if you want to operate the EQ fully headlessly.
 
-Note: If you're only using programmatic control, you need not import the `weq8/ui` module at all, and can operate purely on the runtime.
+Note: If you're only using programmatic control, you need not import the `weq8c/ui` module at all, and can operate purely on the runtime.
 
 All control methods take the filter number 0-7 as the first argument.
 
