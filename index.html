@@ -1,80 +1,694 @@
-<!DOCTYPE html>
-<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>weq8</title>
+    <title>WEQ8C Example</title>
     <script type="module" src="/src/ui/index.ts"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style type="text/css">
+      code {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-size: 11px;
+        background-color: var(--bg-control, #25252b);
+        color: var(--text-secondary, #a0a0ab);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color, #2c2c35);
+        vertical-align: middle;
+        margin-left: 8px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+      }
+      :root {
+        --bg-dark: #121214;
+        --bg-panel: #1a1a1e;
+        --bg-control: #25252b;
+        --accent: #00ffcc;
+        --accent-glow: rgba(0, 255, 204, 0.15);
+        --text-primary: #f3f3f6;
+        --text-secondary: #a0a0ab;
+        --border-color: #2c2c35;
+        --danger: #ff3366;
+        --success: #22aa55;
+      }
+      
       body {
-        background-color: #555;
-        color: white;
-      }
-      .viewSelect {
-        display: flex;
-        justify-content: center;
-        margin: 20px 0;
-      }
-      button {
-        display: block;
-        margin: 50px auto;
-      }
-      weq8-ui {
-        max-width: 800px;
-        margin: 0 auto;
-      }
-      .cssInject {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-dark);
+        color: var(--text-primary);
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        min-height: 100vh;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        margin: 20px auto;
-        max-width: 500px;
-        gap: 10px;
       }
-      .cssInject textarea {
+
+      header {
+        background-color: var(--bg-panel);
+        border-bottom: 1px solid var(--border-color);
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+      }
+
+      .main-layout {
+        display: flex;
+        flex: 1;
+        gap: 20px;
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+        width: calc(100% - 48px);
+        box-sizing: border-box;
+      }
+
+      /* Left Side: EQ UI & Custom CSS */
+      .left-column {
+        flex: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 0;
+      }
+
+      /* Right Side: Control Panels & Debugging */
+      .right-column {
+        flex: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 340px;
+      }
+
+      .card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .card-title {
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Playback controls widget */
+      .playback-widget {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: var(--bg-control);
+        border-radius: 8px;
+        padding: 14px;
+        border: 1px solid var(--border-color);
+      }
+
+      .playback-controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      /* Beautiful buttons & controls */
+      .btn {
+        background: var(--bg-control);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .btn:hover {
+        background: var(--border-color);
+        border-color: var(--text-secondary);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #121214;
+        border: none;
+      }
+
+      .btn-primary:hover {
+        background: #00e6b8;
+      }
+
+      /* Custom File input styling */
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        height: 38px; /* Force identical physical button height */
+      }
+
+      .file-input-wrapper input[type=file] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
         width: 100%;
-        height: 100px;
-        background: #333;
-        color: white;
-        border: 1px solid #777;
-        padding: 8px;
+        height: 100%;
+        cursor: pointer;
+      }
+
+      /* Form control items */
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .control-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      select, textarea {
+        background: var(--bg-control);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-family: inherit;
+        outline: none;
+      }
+
+      select:focus, textarea:focus {
+        border-color: var(--accent);
+      }
+
+      textarea {
+        width: 100%;
+        height: 80px;
+        font-family: monospace;
+        font-size: 12px;
+        box-sizing: border-box;
+        resize: vertical;
+      }
+
+      /* View selector switch style */
+      .view-selector {
+        display: flex;
+        background: var(--bg-control);
+        border-radius: 8px;
+        padding: 3px;
+        border: 1px solid var(--border-color);
+      }
+
+      .view-selector label {
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .view-selector input {
+        display: none;
+      }
+
+      .view-selector label:has(input:checked) {
+        background: var(--bg-panel);
+        color: var(--accent);
+      }
+
+      /* Range Sliders */
+      input[type=range] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        background: #111; /* Visible dark track */
+        height: 6px;
+        border-radius: 3px;
+        outline: none;
+        border: 1px solid var(--border-color);
+      }
+
+      input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 14px;
+        width: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+      }
+
+      /* Loader Spinner Styles */
+      .loader-container {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--accent);
+        margin-top: 8px;
         font-family: monospace;
       }
-      .cssInject button {
-        margin: 0;
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(0, 255, 204, 0.2);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Info icon styles */
+      .info-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: #333;
+        color: #bbb;
+        font-size: 10px;
+        font-weight: bold;
+        cursor: help;
+        position: relative;
+      }
+
+      .info-trigger:hover {
+        background: var(--accent);
+        color: #121214;
+      }
+
+      /* Tooltip text styling */
+      .info-trigger::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 22px;
+        right: -50px;
+        width: 200px;
+        background: #111;
+        color: #eee;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        font-weight: 400;
+        line-height: 1.4;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.15s ease, visibility 0.15s ease;
+        z-index: 100;
+        pointer-events: none;
+      }
+
+      .info-trigger:hover::after {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      /* Debug lists */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        font-family: monospace;
+        font-size: 13px;
+      }
+
+      .stat-section {
+        background: var(--bg-control);
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+      }
+
+      .stat-section h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .stat-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .badge {
+        font-weight: 600;
+      }
+
+      #clippingIndicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #444;
+        box-shadow: 0 0 8px rgba(0,0,0,0.5);
+      }
+
+      /* EQ Container custom styling wrap */
+      weq8-ui {
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      @media (max-width: 1000px) {
+        .main-layout {
+          flex-direction: column;
+        }
       }
     </style>
   </head>
   <body>
-    <button id="startstop">Start</button>
-    <div class="viewSelect">
-      <label
-        ><input type="radio" name="view" value="allBands" checked /> All
-        bands</label
-      >
-      <label><input type="radio" name="view" value="hud" /> HUD</label>
-    </div>
-    <div class="cssInject">
-      <h3>Inject Custom CSS</h3>
-      <textarea id="cssInput" placeholder="Click 'Load Example' or type here..."></textarea>
-      <div style="display: flex; gap: 10px;">
-        <button id="loadExampleBtn">Load Example</button>
-        <button id="injectBtn">Save CSS & Reload</button>
+    <header>
+      <h1>WEQ8C<code id="versionBadge"></code> Example</h1>
+    </header>
+
+    <main class="main-layout">
+      <!-- Left side of screen: EQ view -->
+      <div class="left-column">
+        <div class="card" style="display: flex; flex-direction: column; gap: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 16px; color: var(--text-primary);">Parametric Equalizer</h3>
+            
+            <div class="view-selector">
+              <label>
+                <input type="radio" name="view" value="allBands" checked />
+                All Bands
+              </label>
+              <label>
+                <input type="radio" name="view" value="hud" />
+                HUD
+              </label>
+            </div>
+          </div>
+          
+          <div id="eqContainer"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Custom CSS Overrides</h3>
+          <div class="control-group">
+            <textarea id="cssInput" placeholder="Click 'Load Example' or write custom CSS here..."></textarea>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button id="loadExampleBtn" class="btn" style="padding: 6px 12px; font-size: 12px;">Load Template</button>
+              <button id="injectBtn" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Apply Style</button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-    
-    <div id="eqContainer"></div>
+
+      <!-- Right side: Controls & Debug statistics -->
+      <div class="right-column">
+        <div class="card">
+          <h3 class="card-title">Audio Source</h3>
+          
+          <div class="playback-widget">
+            <div class="playback-controls" style="display: flex; gap: 8px; align-items: stretch;">
+              <button id="startstop" class="btn btn-primary" style="flex: 1; justify-content: center; height: 38px; padding: 0;">Start Playback</button>
+              
+              <div class="file-input-wrapper btn" style="flex: 1; justify-content: center; padding: 0;">
+                <span>Upload File</span>
+                <input type="file" id="audioFile" accept="audio/*" />
+              </div>
+              
+              <button id="resetAudio" class="btn" style="flex: 1; justify-content: center; height: 38px; padding: 0;" title="Reset back to default audio loop">Reset Audio</button>
+            </div>
+
+            <!-- Loader spinner component -->
+            <div id="loaderContainer" class="loader-container">
+              <div class="spinner"></div>
+              <span>Decoding audio file...</span>
+            </div>
+            
+            <!-- Audio progress bar timeline tracker -->
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+              <input type="range" id="audioProgress" min="0" max="100" value="0" step="0.1" style="width: 100%; cursor: pointer;" />
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); font-family: monospace;">
+                <span id="currentTime">0:00</span>
+                <span id="durationTime">0:00</span>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 12px;">
+              <span style="color: var(--text-secondary);">Current Track:</span>
+              <span id="fileName" style="font-weight: 500; color: var(--accent); max-width: 180px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">testloop.m4a</span>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 12px 0;" />
+
+            <div class="control-group" style="display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <div class="control-row" style="margin-bottom: 4px;">
+                  <label for="inputGainSlider" style="font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                    Input Gain
+                    <span class="info-trigger" data-tooltip="Adjust the volume of the audio entering the EQ filterbank.">i</span>
+                  </label>
+                  <span id="inputGainVal" style="font-weight: 600; color: var(--accent);">1.00x</span>
+                </div>
+                <input type="range" id="inputGainSlider" min="0.0" max="2.0" step="0.05" value="1.0" />
+              </div>
+
+              <div>
+                <div class="control-row" style="margin-bottom: 4px;">
+                  <label for="outputGainSlider" style="font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                    Output Gain
+                    <span class="info-trigger" data-tooltip="Adjust the final output volume after EQ and saturation stages.">i</span>
+                  </label>
+                  <span id="outputGainVal" style="font-weight: 600; color: var(--accent);">1.00x</span>
+                </div>
+                <input type="range" id="outputGainSlider" min="0.0" max="2.0" step="0.05" value="1.0" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Presets Card Widget -->
+        <div class="card">
+          <h3 class="card-title">
+            EQ Presets
+            <span class="info-trigger" data-tooltip="Quickly apply predefined frequency curves to shape the audio character.">i</span>
+          </h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button id="presetFlat" class="btn" style="justify-content: center;">Reset (Flat)</button>
+            <button id="presetBass" class="btn" style="justify-content: center;">Bass Boost</button>
+            <button id="presetVocals" class="btn" style="justify-content: center;">Vocal Presence</button>
+            <button id="presetPhone" class="btn" style="justify-content: center;">Radio / Phone</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">
+            Saturation & Clipping
+            <span class="info-trigger" data-tooltip="Applies limiting or clipping functions to prevent digital distortion when the EQ gain pushes levels above 0 dBFS.">i</span>
+          </h3>
+          
+          <div class="control-group">
+            <div class="control-row">
+              <label for="saturationModeSelect" style="font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                Mode
+                <span class="info-trigger" data-tooltip="Soft clip uses smooth tanh curves. Hard clip flat-cuts samples. Foldback mirrors peaks back. Limiter uses slow dynamic compression.">i</span>
+              </label>
+              <select id="saturationModeSelect" style="width: 60%;">
+                <option value="none">None (Passthrough)</option>
+                <option value="soft">Soft Clip (tanh)</option>
+                <option value="hard">Hard Clip</option>
+                <option value="foldback">Foldback (Reverse Clip)</option>
+                <option value="limit">Limiter</option>
+              </select>
+            </div>
+            
+            <div style="margin-top: 10px;">
+              <div class="control-row" style="margin-bottom: 6px;">
+                <label for="thresholdSlider" style="font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                  Threshold Limit
+                  <span class="info-trigger" data-tooltip="Set the amplitude threshold (from 0.1 to 1.0) where clipping or limiting algorithm takes effect.">i</span>
+                </label>
+                <span id="thresholdVal" style="font-weight: 600; color: var(--accent);">1.00</span>
+              </div>
+              <input type="range" id="thresholdSlider" min="0.1" max="1.0" step="0.05" value="1.0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">System Telemetry</h3>
+          
+          <div class="stats-grid">
+            <!-- Left Side: Curve Metrics -->
+            <div class="stat-section">
+              <h4>
+                Filter Curve
+                <span class="info-trigger" data-tooltip="Analyzes the static response of all equalizer filters combined.">i</span>
+              </h4>
+              
+              <div class="stat-row">
+                <span>Peak:</span>
+                <span id="curveMaxDb" class="badge" style="color: var(--accent);">0.00 dB</span>
+              </div>
+              <div class="stat-row" style="font-size: 11px; justify-content: flex-end; color: var(--text-secondary); margin-bottom: 8px;">
+                <span id="curveMaxDbFreq">20 Hz</span>
+              </div>
+
+              <div class="stat-row">
+                <span>Dip:</span>
+                <span id="curveMinDb" class="badge" style="color: var(--danger);">0.00 dB</span>
+              </div>
+              <div class="stat-row" style="font-size: 11px; justify-content: flex-end; color: var(--text-secondary); margin-bottom: 8px;">
+                <span id="curveMinDbFreq">20 Hz</span>
+              </div>
+
+              <div class="stat-row">
+                <span>Phase:</span>
+                <span id="curveMaxPhase" style="color: #d1b3ff;">0.00°</span>
+              </div>
+              
+              <div class="stat-row" style="margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                <span>Active Bands:</span>
+                <span id="activeBands" style="color: #fff;">0</span>
+              </div>
+              <div class="stat-row">
+                <span>Nodes Used:</span>
+                <span id="totalBiquadNodes" style="color: var(--text-secondary);">0</span>
+              </div>
+            </div>
+
+            <!-- Right Side: Live Audio Analysis -->
+            <div class="stat-section" style="display: flex; flex-direction: column;">
+              <h4>
+                Live Audio
+                <span class="info-trigger" data-tooltip="Performs dynamic analysis on the active output waveform.">i</span>
+              </h4>
+              
+              <div class="stat-row" style="margin-bottom: 12px;">
+                <span>Live Peak:</span>
+                <span id="audioMaxDb" class="badge" style="color: var(--accent);">-96.00 dB</span>
+              </div>
+              
+              <div class="stat-row" style="margin-bottom: 16px;">
+                <span>Dom Freq:</span>
+                <span id="audioMaxDbFreq" style="color: var(--text-secondary);">0 Hz</span>
+              </div>
+
+              <div style="margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 4px;">
+                  Clipping:
+                  <span class="info-trigger" data-tooltip="Red when output peaks exceed threshold limit. Green when safe.">i</span>
+                </span>
+                <span id="clippingIndicator"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
     <script type="module">
       import { WEQ8Runtime } from "/src/main.ts";
       import { WEQ8UIElement, EQUIFilterRowElement } from "/src/ui/index.ts";
 
-      const savedCss = localStorage.getItem("weq8c_custom_css");
-      if (savedCss) {
-        document.getElementById("cssInput").value = savedCss;
-        WEQ8UIElement.addCustomStyles(savedCss);
-        EQUIFilterRowElement.addCustomStyles(savedCss);
-      }
+      // Force-clear any cached pink/stale templates from localStorage
+      localStorage.removeItem("weq8c_custom_css");
+      
+      let savedCss = `/* Custom overrides for WEQ8 components */
+
+* {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Style canvas filter handles with green accent */
+.filter-handle {
+  background-color: #00ffcc !important;
+  color: #121214 !important;
+  box-shadow: none !important;
+}
+
+.filter-handle.selected {
+  background-color: #ffffff !important;
+  color: #121214 !important;
+  box-shadow: none !important;
+}
+
+.filter-handle.bypassed {
+  background-color: #7d7d7d !important;
+  color: #121214 !important;
+}
+
+/* Style table row filter badges with green accent */
+.filterNumber {
+  background-color: #00ffcc !important;
+  color: #121214 !important;
+}
+
+:host(.selected) .chip .filterNumber {
+  background-color: #ffffff !important;
+  color: #121214 !important;
+}
+
+.chip.bypassed .filterNumber {
+  background-color: #7d7d7d !important;
+  color: #121214 !important;
+}
+
+.chip.disabled .filterNumber {
+  background-color: transparent !important;
+  color: #7d7d7d !important;
+}
+
+.filters thead th {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #a0a0ab !important;
+}`;
+
+      document.getElementById("cssInput").value = savedCss;
+      WEQ8UIElement.addCustomStyles(savedCss);
+      EQUIFilterRowElement.addCustomStyles(savedCss);
 
       document.getElementById("injectBtn").addEventListener("click", () => {
         const css = document.getElementById("cssInput").value;
@@ -83,41 +697,436 @@
       });
 
       document.getElementById("loadExampleBtn").addEventListener("click", () => {
-        document.getElementById("cssInput").value = `.filter-handle {\n  background: #ff0055 !important;\n  color: white !important;\n}\n.filter-handle.selected {\n  background: #00ffcc !important;\n}`;
+        document.getElementById("cssInput").value = savedCss;
       });
 
+      // Audio setup
       let audioctx = new AudioContext();
       let runtime = new WEQ8Runtime(audioctx);
       runtime.connect(audioctx.destination);
 
-      // 3. NOW instantiate the component, so it picks up the new static styles
+      // Display version from runtime
+      document.getElementById("versionBadge").textContent = WEQ8Runtime.version;
+
+      // Saturation controls wire-up
+      const modeSelect = document.getElementById("saturationModeSelect");
+      const thresholdSlider = document.getElementById("thresholdSlider");
+      const thresholdValText = document.getElementById("thresholdVal");
+
+      // Gain controls wire-up
+      const inputGainSlider = document.getElementById("inputGainSlider");
+      const inputGainValText = document.getElementById("inputGainVal");
+      const outputGainSlider = document.getElementById("outputGainSlider");
+      const outputGainValText = document.getElementById("outputGainVal");
+
+      function updateInputGain() {
+        const val = parseFloat(inputGainSlider.value);
+        inputGainValText.textContent = val.toFixed(2) + "x";
+        runtime.inputGain = val;
+      }
+
+      function updateOutputGain() {
+        const val = parseFloat(outputGainSlider.value);
+        outputGainValText.textContent = val.toFixed(2) + "x";
+        runtime.outputGain = val;
+      }
+
+      inputGainSlider.addEventListener("input", updateInputGain);
+      outputGainSlider.addEventListener("input", updateOutputGain);
+
+      // Initialize gain values
+      updateInputGain();
+      updateOutputGain();
+
+      // Debug DOM elements
+      const curveMaxDbSpan = document.getElementById("curveMaxDb");
+      const curveMaxDbFreqSpan = document.getElementById("curveMaxDbFreq");
+      const curveMinDbSpan = document.getElementById("curveMinDb");
+      const curveMinDbFreqSpan = document.getElementById("curveMinDbFreq");
+      const curveMaxPhaseSpan = document.getElementById("curveMaxPhase");
+      const activeBandsSpan = document.getElementById("activeBands");
+      const totalBiquadNodesSpan = document.getElementById("totalBiquadNodes");
+
+      const audioMaxDbSpan = document.getElementById("audioMaxDb");
+      const audioMaxDbFreqSpan = document.getElementById("audioMaxDbFreq");
+      const clippingIndicator = document.getElementById("clippingIndicator");
+
+      function updateSaturation() {
+        const mode = modeSelect.value;
+        const thresh = parseFloat(thresholdSlider.value);
+        thresholdValText.textContent = thresh.toFixed(2);
+        runtime.setSaturationMode(mode, { threshold: thresh });
+      }
+
+      function updateStaticDebugStats() {
+        const stats = runtime.getDebugStats();
+        
+        curveMaxDbSpan.textContent = stats.curveMaxDb.toFixed(2) + " dB";
+        curveMaxDbFreqSpan.textContent = `${stats.curveMaxDbFreq.toFixed(0)} Hz`;
+        
+        curveMinDbSpan.textContent = stats.curveMinDb.toFixed(2) + " dB";
+        curveMinDbFreqSpan.textContent = `${stats.curveMinDbFreq.toFixed(0)} Hz`;
+
+        curveMaxPhaseSpan.textContent = stats.curveMaxPhase.toFixed(1) + "°";
+        activeBandsSpan.textContent = stats.activeBandsCount;
+        totalBiquadNodesSpan.textContent = stats.totalBiquadNodes;
+      }
+
+      function updateLiveAudioStats() {
+        const stats = runtime.getDebugStats();
+
+        audioMaxDbSpan.textContent = stats.audioMaxDb.toFixed(2) + " dB";
+        audioMaxDbFreqSpan.textContent = stats.audioMaxDbFreq.toFixed(0) + " Hz";
+
+        if (stats.isClipping) {
+          clippingIndicator.style.background = "var(--danger)";
+          clippingIndicator.style.boxShadow = "none";
+        } else {
+          clippingIndicator.style.background = "var(--success)";
+          clippingIndicator.style.boxShadow = "none";
+        }
+
+        requestAnimationFrame(updateLiveAudioStats);
+      }
+
+      modeSelect.addEventListener("change", updateSaturation);
+      thresholdSlider.addEventListener("input", updateSaturation);
+      runtime.on("filtersChanged", updateStaticDebugStats);
+
+      // Initialize saturation modes & UI loops
+      updateSaturation();
+      updateStaticDebugStats();
+      updateLiveAudioStats();
+
+      // Hook up presets buttons
+      const presets = {
+        flat: [
+          { type: "lowshelf12", frequency: 30, gain: 0, Q: 0.7, bypass: false },
+          { type: "peaking12", frequency: 200, gain: 0, Q: 0.7, bypass: false },
+          { type: "peaking12", frequency: 1000, gain: 0, Q: 0.7, bypass: false },
+          { type: "highshelf12", frequency: 5000, gain: 0, Q: 0.7, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false }
+        ],
+        bass: [
+          // Gentle low shelf boost at 80Hz (+6dB)
+          { type: "lowshelf12", frequency: 80, gain: 6.0, Q: 0.7, bypass: false },
+          // Peak boost at 120Hz (+3dB) for punch
+          { type: "peaking12", frequency: 120, gain: 3.0, Q: 0.8, bypass: false },
+          // Muddy range reduction at 300Hz (-3dB)
+          { type: "peaking12", frequency: 300, gain: -3.0, Q: 0.7, bypass: false },
+          // Keep highs flat
+          { type: "highshelf12", frequency: 6000, gain: 0, Q: 0.7, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false }
+        ],
+        vocals: [
+          // Roll off low rumble
+          { type: "highpass12", frequency: 80, gain: 0, Q: 0.7, bypass: false },
+          // De-mud the low-mids around 250Hz
+          { type: "peaking12", frequency: 250, gain: -2.5, Q: 0.7, bypass: false },
+          // Presence boost at 3kHz (+3.5dB)
+          { type: "peaking12", frequency: 3000, gain: 3.5, Q: 1.0, bypass: false },
+          // Air shelf boost at 10kHz (+4dB)
+          { type: "highshelf12", frequency: 10000, gain: 4.0, Q: 0.7, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false }
+        ],
+        phone: [
+          // Harsh low cut at 400Hz
+          { type: "highpass24", frequency: 400, gain: 0, Q: 0.7, bypass: false },
+          // Nasal bandpass peak at 1.5kHz (+6dB)
+          { type: "peaking12", frequency: 1500, gain: 6.0, Q: 1.5, bypass: false },
+          // Telephone range peak at 2.5kHz
+          { type: "peaking12", frequency: 2500, gain: 3.0, Q: 1.2, bypass: false },
+          // Harsh high cut at 3.5kHz
+          { type: "lowpass24", frequency: 3500, gain: 0, Q: 0.7, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false },
+          { type: "noop", frequency: 350, gain: 0, Q: 1, bypass: false }
+        ]
+      };
+
+      function applyPreset(presetKey) {
+        const spec = presets[presetKey];
+        for (let i = 0; i < spec.length; i++) {
+          runtime.setFilterType(i, spec[i].type);
+          runtime.toggleBypass(i, spec[i].bypass);
+          runtime.setFilterFrequency(i, spec[i].frequency);
+          runtime.setFilterQ(i, spec[i].Q);
+          runtime.setFilterGain(i, spec[i].gain);
+        }
+        updateStaticDebugStats();
+      }
+
+      document.getElementById("presetFlat").addEventListener("click", () => applyPreset("flat"));
+      document.getElementById("presetBass").addEventListener("click", () => applyPreset("bass"));
+      document.getElementById("presetVocals").addEventListener("click", () => applyPreset("vocals"));
+      document.getElementById("presetPhone").addEventListener("click", () => applyPreset("phone"));
+
+      // Render the EQ web component inside container
       const uiElement = document.createElement("weq8-ui");
       uiElement.setAttribute("view", "allBands");
       uiElement.runtime = runtime;
       document.getElementById("eqContainer").appendChild(uiElement);
 
-      fetch("/testloop.m4a")
-        .then((res) => res.arrayBuffer())
-        .then((buf) => audioctx.decodeAudioData(buf))
-        .then((buf) => {
-          let btn = document.getElementById("startstop");
-          let src;
-          btn.addEventListener("click", () => {
-            if (btn.textContent == "Start") {
-              src = audioctx.createBufferSource();
-              src.buffer = buf;
-              src.loop = true;
-              src.connect(runtime.input);
-              src.start();
-              btn.textContent = "Stop";
-            } else {
-              src.stop();
-              src.disconnect();
-              src = null;
-              btn.textContent = "Start";
-            }
+      // Manage playback source buffer state
+      let activeBuffer = null;
+      let activeSourceNode = null;
+      
+      // Playback timing trackers
+      let startTime = 0;
+      let pauseOffset = 0;
+      let isPlaying = false;
+      let animationFrameId = null;
+
+      const startStopBtn = document.getElementById("startstop");
+      const fileInput = document.getElementById("audioFile");
+      const fileNameSpan = document.getElementById("fileName");
+      const resetAudioBtn = document.getElementById("resetAudio");
+      const progressSlider = document.getElementById("audioProgress");
+      const currentTimeSpan = document.getElementById("currentTime");
+      const durationTimeSpan = document.getElementById("durationTime");
+
+      function formatTime(secs) {
+        const m = Math.floor(secs / 60);
+        const s = Math.floor(secs % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+
+      function updateTimeline() {
+        if (!activeBuffer || !isPlaying) return;
+        const elapsed = (audioctx.currentTime - startTime) + pauseOffset;
+        const duration = activeBuffer.duration;
+        
+        if (elapsed >= duration) {
+          // Looped buffer wrapped around
+          startTime = audioctx.currentTime;
+          pauseOffset = 0;
+          progressSlider.value = 0;
+          currentTimeSpan.textContent = "0:00";
+        } else {
+          progressSlider.value = (elapsed / duration) * 100;
+          currentTimeSpan.textContent = formatTime(elapsed);
+        }
+        animationFrameId = requestAnimationFrame(updateTimeline);
+      }
+
+      function playSource() {
+        if (!activeBuffer) return;
+        if (activeSourceNode) {
+          stopSource();
+        }
+        
+        if (audioctx.state === "suspended") {
+          audioctx.resume();
+        }
+
+        activeSourceNode = audioctx.createBufferSource();
+        activeSourceNode.buffer = activeBuffer;
+        activeSourceNode.loop = true;
+        activeSourceNode.connect(runtime.input);
+        
+        const offset = pauseOffset % activeBuffer.duration;
+        activeSourceNode.start(0, offset);
+        startTime = audioctx.currentTime;
+        isPlaying = true;
+        
+        startStopBtn.textContent = "Stop Playback";
+        startStopBtn.classList.remove("btn-primary");
+        startStopBtn.style.background = "var(--danger)";
+        
+        updateTimeline();
+      }
+
+      function stopSource() {
+        if (activeSourceNode) {
+          try {
+            activeSourceNode.stop();
+          } catch(e) {}
+          activeSourceNode.disconnect();
+          activeSourceNode = null;
+        }
+        if (isPlaying) {
+          pauseOffset += (audioctx.currentTime - startTime);
+          isPlaying = false;
+        }
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        startStopBtn.textContent = "Start Playback";
+        startStopBtn.classList.add("btn-primary");
+        startStopBtn.style.background = "";
+      }
+
+      startStopBtn.addEventListener("click", () => {
+        if (isPlaying) {
+          stopSource();
+        } else {
+          playSource();
+        }
+      });
+
+      // Slider seek manipulation
+      progressSlider.addEventListener("input", () => {
+        if (!activeBuffer) return;
+        const wasPlaying = isPlaying;
+        stopSource();
+        const percent = parseFloat(progressSlider.value) / 100;
+        pauseOffset = percent * activeBuffer.duration;
+        currentTimeSpan.textContent = formatTime(pauseOffset);
+        if (wasPlaying) {
+          playSource();
+        }
+      });
+
+      const loaderContainer = document.getElementById("loaderContainer");
+
+      // Initialize IndexedDB to store custom audio files reliably without hitting 5MB local storage limits
+      const dbName = "WEB8C_AudioStore";
+      const storeName = "audio_tracks";
+      let db = null;
+
+      const request = indexedDB.open(dbName, 1);
+      request.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains(storeName)) {
+          database.createObjectStore(storeName);
+        }
+      };
+      request.onsuccess = (e) => {
+        db = e.target.result;
+        // Check for persisted/cached custom uploaded track in IndexedDB first
+        loadCachedAudio();
+      };
+      request.onerror = (e) => {
+        console.warn("IndexedDB failed to open, falling back to default.", e);
+        fetchDefaultTrack();
+      };
+
+      function saveAudioToDB(arrayBuffer, name) {
+        if (!db) return;
+        try {
+          const transaction = db.transaction([storeName], "readwrite");
+          const store = transaction.objectStore(storeName);
+          store.put(arrayBuffer, "cached_track");
+          store.put(name, "cached_name");
+        } catch (e) {
+          console.error("Failed to save audio file to IndexedDB:", e);
+        }
+      }
+
+      function loadCachedAudio() {
+        if (!db) {
+          fetchDefaultTrack();
+          return;
+        }
+        try {
+          const transaction = db.transaction([storeName], "readonly");
+          const store = transaction.objectStore(storeName);
+          const getTrack = store.get("cached_track");
+          const getName = store.get("cached_name");
+
+          getTrack.onsuccess = () => {
+            getName.onsuccess = () => {
+              if (getTrack.result && getName.result) {
+                fileNameSpan.textContent = getName.result;
+                loadAudioBuffer(getTrack.result, false);
+              } else {
+                fetchDefaultTrack();
+              }
+            };
+          };
+          getTrack.onerror = () => fetchDefaultTrack();
+        } catch(e) {
+          fetchDefaultTrack();
+        }
+      }
+
+      function clearCachedAudio() {
+        if (!db) return;
+        try {
+          const transaction = db.transaction([storeName], "readwrite");
+          const store = transaction.objectStore(storeName);
+          store.delete("cached_track");
+          store.delete("cached_name");
+        } catch(e) {
+          console.error("Failed to clear IndexedDB audio cache:", e);
+        }
+      }
+
+      // Load audio from ArrayBuffer
+      function loadAudioBuffer(arrayBuffer, saveToStore = false, fileName = "") {
+        loaderContainer.style.display = "flex";
+        
+        // Use setTimeout to ensure the browser updates the DOM layout to show the loader before decoding starts
+        setTimeout(() => {
+          audioctx.decodeAudioData(arrayBuffer.slice(0))
+            .then((decodedBuffer) => {
+              activeBuffer = decodedBuffer;
+              durationTimeSpan.textContent = formatTime(activeBuffer.duration);
+              progressSlider.value = 0;
+              currentTimeSpan.textContent = "0:00";
+              pauseOffset = 0;
+              
+              if (saveToStore && fileName) {
+                saveAudioToDB(arrayBuffer, fileName);
+              }
+
+              if (isPlaying) {
+                playSource(); // Restart with new track if playing
+              }
+              loaderContainer.style.display = "none";
+            })
+            .catch((err) => {
+              loaderContainer.style.display = "none";
+              alert("Error decoding audio data. Please ensure it's a valid audio format.");
+              console.error(err);
+            });
+        }, 50);
+      }
+
+      // Handle custom file uploads
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        fileNameSpan.textContent = file.name;
+        
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          loadAudioBuffer(evt.target.result, true, file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+
+      // Reset back to default testloop track
+      resetAudioBtn.addEventListener("click", () => {
+        stopSource();
+        clearCachedAudio();
+        fileNameSpan.textContent = "testloop.m4a";
+        fetchDefaultTrack();
+      });
+
+      function fetchDefaultTrack() {
+        fetch("/testloop.m4a")
+          .then((res) => res.arrayBuffer())
+          .then((buf) => {
+            loadAudioBuffer(buf, false);
+          })
+          .catch(err => {
+            console.warn("Default test loop m4a not found. Please upload a file manually.", err);
           });
-        });
+      }
+
+      // Toggle views
       document.querySelectorAll("input[name=view]").forEach((el) =>
         el.addEventListener("change", (e) => {
           document.querySelector("weq8-ui").setAttribute("view", e.target.value);

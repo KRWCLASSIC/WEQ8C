@@ -1,4 +1,4 @@
-# WEQ8C
+# WEQ8C `0.3.0`
 
 [![NPM](https://nodei.co/npm/weq8c.png?compact=true)](https://npmjs.org/package/weq8c)
 
@@ -93,6 +93,23 @@ When initialising the runtime on a subsequent load, you may provide a previous s
 ```ts
 let weq8 = new WEQ8Runtime(yourAudioCtx, state);
 ```
+
+## Anti-Distortion & Level Controls (WEQ8C Exclusive)
+
+WEQ8C introduces dynamic output saturation/clipping algorithms and channel level controls to prevent digital clipping when boosting equalizer bands:
+
+- **Input & Output Gain**: Control the level of the signal entering the EQ bank (`weq8.inputGain = 1.2`) or exiting the final processing stage (`weq8.outputGain = 0.8`).
+- **Saturation Modes**:
+  - `none`: Passthrough mode.
+  - `soft`: Soft clipping using smooth hyperbolic tangent (`tanh`) curves.
+  - `hard`: Hard clipping that flat-clamps sample amplitude.
+  - `foldback`: A foldback/mirror distortion wave-shaper that reverses peaks exceeding the threshold.
+  - `limit`: Standard brickwall-like dynamic limiter.
+- **Dynamic Threshold Control**: Set the threshold parameter (`weq8.setSaturationMode(mode, { threshold: 0.8 })`) between `0.1` and `1.0`.
+
+### Backwards Compatibility
+
+WEQ8C is **fully backwards compatible** with the original `weq8` package. All legacy method names, events, and configuration states are preserved unchanged. You can drop in `weq8c` as a replacement without modifying existing code.
 
 ## Custom CSS Injection (WEQ8C Exclusive)
 

@@ -110,3 +110,42 @@ export function formatFrequencyUnit(freq: number, keepHz = false) {
   }
   return "Hz";
 }
+
+export function buildHardClipCurve(length: number, threshold: number): Float32Array {
+  const curve = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    const x = (i / (length - 1)) * 2 - 1; // range [-1, 1]
+    curve[i] = clamp(x, -threshold, threshold);
+  }
+  return curve;
+}
+
+export function buildSoftClipCurve(length: number, threshold: number): Float32Array {
+  const curve = new Float32Array(length);
+  // Using a soft-clip approach: linear below threshold * 0.5, tanh-like/smooth mapping up to/above threshold
+  for (let i = 0; i < length; i++) {
+    const x = (i / (length - 1)) * 2 - 1; // range [-1, 1]
+    // tanh soft clipping: we can scale x by 1/threshold then apply tanh, then scale back
+    // Or just a standard soft clipping function: f(x) = tanh(x / threshold) * threshold
+    curve[i] = Math.tanh(x / threshold) * threshold;
+  }
+  return curve;
+}
+
+export function buildFoldbackCurve(length: number, threshold: number): Float32Array {
+  const curve = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    let x = (i / (length - 1)) * 2 - 1; // range [-1, 1]
+    // Foldback: if x exceeds threshold, fold it back.
+    // e.g. if x > threshold: x = threshold - (x - threshold) = 2*threshold - x
+    // similarly for negative values
+    if (x > threshold) {
+      x = 2 * threshold - x;
+    } else if (x < -threshold) {
+      x = -2 * threshold - x;
+    }
+    curve[i] = clamp(x, -1, 1);
+  }
+  return curve;
+}
+

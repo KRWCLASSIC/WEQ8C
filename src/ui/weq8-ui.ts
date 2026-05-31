@@ -210,7 +210,7 @@ export class WEQ8UIElement extends LitElement {
   render() {
     return html`
       ${this.view === "allBands" ? this.renderTable() : null}
-      <div class="visualisation">
+      <div class="visualisation" @wheel=${(evt: WheelEvent) => evt.preventDefault()}>
         <svg
           viewBox="0 0 100 10"
           preserveAspectRatio="none"
@@ -307,6 +307,7 @@ export class WEQ8UIElement extends LitElement {
       @pointerup=${(evt: PointerEvent) =>
         this.stopDraggingFilterHandle(evt, idx)}
       @pointermove=${(evt: PointerEvent) => this.dragFilterHandle(evt, idx)}
+      @wheel=${(evt: WheelEvent) => this.onWheelFilterHandle(evt, idx)}
     >
       <div
         class="${classMap({
@@ -356,7 +357,7 @@ export class WEQ8UIElement extends LitElement {
           top: 0,
           width: 0,
           height: 0,
-        };
+          };
       let pointerX = evt.clientX - canvasBounds.left;
       let pointerY = evt.clientY - canvasBounds.top;
       let pointerFreq = toLin(
@@ -373,6 +374,39 @@ export class WEQ8UIElement extends LitElement {
       } else {
         let pointerGain = clamp(relY * 30 - 15, -15, 15);
         this.runtime.setFilterGain(idx, pointerGain);
+      }
+    }
+  }
+
+  private onWheelFilterHandle(evt: WheelEvent, idx: number) {
+    if (!this.runtime) return;
+    evt.preventDefault();
+    
+    const spec = this.runtime.spec[idx];
+    const direction = evt.deltaY < 0 ? 1 : -1; // up scroll boosts, down scroll cuts
+
+    if (evt.shiftKey) {
+      // 1. Shift + Scroll: Adjust Frequency (High precision)
+      const minFreq = 10;
+      const maxFreq = this.runtime.audioCtx.sampleRate / 2;
+      const currentLog = toLog10(spec.frequency, minFreq, maxFreq);
+      const step = 0.01 * direction; // reduced from 0.05 for highly granular precision
+      const targetFreq = toLin(clamp(currentLog + step, 0, 1), minFreq, maxFreq);
+      this.runtime.setFilterFrequency(idx, targetFreq);
+    } else if (evt.ctrlKey) {
+      // 2. Ctrl + Scroll: Adjust Q value (High precision)
+      const minQ = 0.1;
+      const maxQ = 18;
+      const currentLog = toLog10(spec.Q, minQ, maxQ);
+      const step = 0.01 * direction; // reduced from 0.05 for highly granular precision
+      const targetQ = toLin(clamp(currentLog + step, 0, 1), minQ, maxQ);
+      this.runtime.setFilterQ(idx, targetQ);
+    } else {
+      // 3. Normal Scroll: Adjust Gain (if supported by filter type)
+      if (filterHasGain(spec.type)) {
+        const step = 0.5 * direction; // 0.5 dB increments
+        const targetGain = clamp(spec.gain + step, -15, 15);
+        this.runtime.setFilterGain(idx, targetGain);
       }
     }
   }
