@@ -303,6 +303,7 @@
         font-weight: bold;
         cursor: help;
         position: relative;
+        flex-shrink: 0;
       }
 
       .info-trigger:hover {
@@ -310,13 +311,10 @@
         color: #121214;
       }
 
-      /* Tooltip text styling */
-      .info-trigger::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        bottom: 22px;
-        right: -50px;
-        width: 200px;
+      /* Smart JS-driven tooltip */
+      #smart-tooltip {
+        position: fixed;
+        max-width: 300px;
         background: #111;
         color: #eee;
         padding: 8px 12px;
@@ -324,19 +322,14 @@
         font-family: 'Inter', sans-serif;
         font-size: 11px;
         font-weight: 400;
-        line-height: 1.4;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.15s ease, visibility 0.15s ease;
-        z-index: 100;
+        line-height: 1.6;
+        border: 1px solid var(--border-color, #2c2c35);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+        white-space: pre-wrap;
+        z-index: 99999;
         pointer-events: none;
-      }
-
-      .info-trigger:hover::after {
-        opacity: 1;
-        visibility: visible;
+        opacity: 0;
+        transition: opacity 0.12s ease;
       }
 
       /* Debug lists */
@@ -413,7 +406,10 @@
       <div class="left-column">
         <div class="card" style="display: flex; flex-direction: column; gap: 15px;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 16px; color: var(--text-primary);">Parametric Equalizer</h3>
+            <h3 style="margin: 0; font-size: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+              Parametric Equalizer
+              <span class="info-trigger" data-tooltip="Band Controls:&#10;• Left-Click (empty chip): Add recommended band&#10;• Right-Click (active chip): Delete / remove band&#10;• Click (active chip): Toggle Bypass (Enable/Disable)&#10;• Drag band number: Reorder bands by swapping settings&#10;  - Drag a band onto another band number to swap their values&#10;  - Band numbering remains sequential (1, 2, 3, ...)&#10;  - Only frequency, gain, Q, type, and other band settings are exchanged&#10;&#10;Mouse Wheel Controls (Hover handle):&#10;• Scroll: Gain (Alt + Scroll for 0.1dB fine adjustment)&#10;• Ctrl + Scroll: Q Factor (Ctrl + Alt + Scroll for 0.01 linear)&#10;• Shift + Scroll: Frequency (Shift + Alt + Scroll for 0.001 log)">i</span>
+            </h3>
             
             <div class="view-selector">
               <label>
@@ -797,6 +793,66 @@
       updateSaturation();
       updateStaticDebugStats();
       updateLiveAudioStats();
+
+      // ── Smart Tooltip ────────────────────────────────────────────────────
+      const TOOLTIP_GAP = 8; // px gap between icon and tooltip
+      const tooltipEl = document.createElement('div');
+      tooltipEl.id = 'smart-tooltip';
+      document.body.appendChild(tooltipEl);
+
+      function showTooltip(trigger) {
+        const text = trigger.getAttribute('data-tooltip');
+        if (!text) return;
+        tooltipEl.textContent = text;
+        tooltipEl.style.opacity = '0';
+        tooltipEl.style.display = 'block';
+
+        // Must be visible (display:block) before measuring
+        requestAnimationFrame(() => {
+          const tw = tooltipEl.offsetWidth;
+          const th = tooltipEl.offsetHeight;
+          const r  = trigger.getBoundingClientRect();
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+
+          // Space available in each direction
+          const spaceBelow  = vh - r.bottom - TOOLTIP_GAP;
+          const spaceAbove  = r.top  - TOOLTIP_GAP;
+          const spaceRight  = vw - r.right - TOOLTIP_GAP;
+          const spaceLeft   = r.left - TOOLTIP_GAP;
+
+          let top, left;
+
+          if (spaceBelow >= th || spaceBelow >= spaceAbove) {
+            // Place below
+            top  = r.bottom + TOOLTIP_GAP;
+            left = r.left + r.width / 2 - tw / 2;
+          } else {
+            // Place above
+            top  = r.top - th - TOOLTIP_GAP;
+            left = r.left + r.width / 2 - tw / 2;
+          }
+
+          // Clamp horizontally within viewport
+          left = Math.max(8, Math.min(left, vw - tw - 8));
+          // Clamp vertically within viewport
+          top  = Math.max(8, Math.min(top,  vh - th - 8));
+
+          tooltipEl.style.top  = top  + 'px';
+          tooltipEl.style.left = left + 'px';
+          tooltipEl.style.opacity = '1';
+        });
+      }
+
+      function hideTooltip() {
+        tooltipEl.style.opacity = '0';
+        tooltipEl.style.display = 'none';
+      }
+
+      document.querySelectorAll('.info-trigger').forEach(el => {
+        el.addEventListener('mouseenter', () => showTooltip(el));
+        el.addEventListener('mouseleave', hideTooltip);
+      });
 
       // Hook up presets buttons
       const presets = {

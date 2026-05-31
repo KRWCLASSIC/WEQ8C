@@ -6,7 +6,7 @@ import { WEQ8Filter } from "../spec";
 import { WEQ8Analyser } from "./WEQ8Analyser";
 import { WEQ8FrequencyResponse } from "./WEQ8FrequencyResponse";
 import { sharedStyles } from "./styles";
-import { clamp, filterHasGain, toLin, toLog10 } from "../functions";
+import { clamp, filterHasGain, filterHasQ, toLin, toLog10 } from "../functions";
 
 import "./weq8-ui-filter-row";
 import "./weq8-ui-filter-hud";
@@ -157,6 +157,12 @@ export class WEQ8UIElement extends LitElement {
   @state()
   private selectedFilterIdx = -1;
 
+  @state()
+  private dragSourceIdx = -1;
+
+  @state()
+  private dragOverIdx = -1;
+
   @query(".analyser")
   private analyserCanvas?: HTMLCanvasElement;
 
@@ -235,7 +241,20 @@ export class WEQ8UIElement extends LitElement {
   }
 
   private renderTable() {
-    return html` <table class="filters">
+    return html` <table class="filters"
+      @band-drag-start=${(e: CustomEvent) => { this.dragSourceIdx = e.detail.index; }}
+      @band-drag-over=${(e: CustomEvent) => { this.dragOverIdx = e.detail.index; }}
+      @band-drag-leave=${(e: CustomEvent) => { if (this.dragOverIdx === e.detail.index) this.dragOverIdx = -1; }}
+      @band-drop=${(e: CustomEvent) => {
+        const target = e.detail.index;
+        if (this.dragSourceIdx !== -1 && target !== this.dragSourceIdx) {
+          this.swapBands(this.dragSourceIdx, target);
+        }
+        this.dragSourceIdx = -1;
+        this.dragOverIdx = -1;
+      }}
+      @dragend=${() => { this.dragSourceIdx = -1; this.dragOverIdx = -1; }}
+    >
       <thead>
         <tr>
           <th class="headerFilter">Filter</th>
@@ -248,7 +267,7 @@ export class WEQ8UIElement extends LitElement {
         ${Array.from({ length: 8 }).map(
           (_, i) =>
             html`<weq8-ui-filter-row
-              class="${classMap({ selected: this.selectedFilterIdx === i })}"
+              class="${classMap({ selected: this.selectedFilterIdx === i, 'drag-over': this.dragOverIdx === i && this.dragSourceIdx !== i })}"
               .runtime=${this.runtime}
               .index=${i}
               @select=${(evt: CustomEvent) => {
@@ -272,6 +291,22 @@ export class WEQ8UIElement extends LitElement {
       .x=${x}
       .y=${y}
     />`;
+  }
+
+  private swapBands(a: number, b: number) {
+    if (!this.runtime) return;
+    const sa = { ...this.runtime.spec[a] };
+    const sb = { ...this.runtime.spec[b] };
+    // Write spec A's values into slot B and vice-versa
+    for (const [src, dst] of [[sa, b], [sb, a]] as const) {
+      this.runtime.setFilterType(dst, src.type);
+      this.runtime.setFilterFrequency(dst, src.frequency);
+      this.runtime.setFilterGain(dst, src.gain);
+      this.runtime.setFilterQ(dst, src.Q);
+      if (src.bypass !== this.runtime.spec[dst].bypass) {
+        this.runtime.toggleBypass(dst, src.bypass);
+      }
+    }
   }
 
   private renderGridX(x: number) {
@@ -385,26 +420,49 @@ export class WEQ8UIElement extends LitElement {
     const spec = this.runtime.spec[idx];
     const direction = evt.deltaY < 0 ? 1 : -1; // up scroll boosts, down scroll cuts
 
-    if (evt.shiftKey) {
-      // 1. Shift + Scroll: Adjust Frequency (High precision)
-      const minFreq = 10;
-      const maxFreq = this.runtime.audioCtx.sampleRate / 2;
+    const minFreq = 10;
+    const maxFreq = this.runtime.audioCtx.sampleRate / 2;
+    const minQ = 0.1;
+    const maxQ = 18;
+
+    if (evt.shiftKey && evt.altKey) {
+      // 1. Shift + Alt + Scroll: Adjust Frequency with ultra-high precision (smaller log step)
       const currentLog = toLog10(spec.frequency, minFreq, maxFreq);
-      const step = 0.01 * direction; // reduced from 0.05 for highly granular precision
+      const step = 0.001 * direction; 
+      const targetFreq = toLin(clamp(currentLog + step, 0, 1), minFreq, maxFreq);
+      this.runtime.setFilterFrequency(idx, targetFreq);
+    } else if (evt.ctrlKey && evt.altKey) {
+      // 2. Ctrl + Alt + Scroll: Adjust Q value by exactly 0.01 linearly (if supported)
+      if (filterHasQ(spec.type)) {
+        const step = 0.01 * direction;
+        const targetQ = clamp(spec.Q + step, minQ, maxQ);
+        this.runtime.setFilterQ(idx, targetQ);
+      }
+    } else if (evt.shiftKey) {
+      // 3. Shift + Scroll: Adjust Frequency (Normal high precision)
+      const currentLog = toLog10(spec.frequency, minFreq, maxFreq);
+      const step = 0.01 * direction;
       const targetFreq = toLin(clamp(currentLog + step, 0, 1), minFreq, maxFreq);
       this.runtime.setFilterFrequency(idx, targetFreq);
     } else if (evt.ctrlKey) {
-      // 2. Ctrl + Scroll: Adjust Q value (High precision)
-      const minQ = 0.1;
-      const maxQ = 18;
-      const currentLog = toLog10(spec.Q, minQ, maxQ);
-      const step = 0.01 * direction; // reduced from 0.05 for highly granular precision
-      const targetQ = toLin(clamp(currentLog + step, 0, 1), minQ, maxQ);
-      this.runtime.setFilterQ(idx, targetQ);
-    } else {
-      // 3. Normal Scroll: Adjust Gain (if supported by filter type)
+      // 4. Ctrl + Scroll: Adjust Q value (Normal log-spaced precision) (if supported)
+      if (filterHasQ(spec.type)) {
+        const currentLog = toLog10(spec.Q, minQ, maxQ);
+        const step = 0.01 * direction;
+        const targetQ = toLin(clamp(currentLog + step, 0, 1), minQ, maxQ);
+        this.runtime.setFilterQ(idx, targetQ);
+      }
+    } else if (evt.altKey) {
+      // 5. Alt + Scroll: Adjust Gain by 0.1 dB (if supported by filter type)
       if (filterHasGain(spec.type)) {
-        const step = 0.5 * direction; // 0.5 dB increments
+        const step = 0.1 * direction;
+        const targetGain = clamp(spec.gain + step, -15, 15);
+        this.runtime.setFilterGain(idx, targetGain);
+      }
+    } else {
+      // 6. Normal Scroll: Adjust Gain by 0.5 dB
+      if (filterHasGain(spec.type)) {
+        const step = 0.5 * direction;
         const targetGain = clamp(spec.gain + step, -15, 15);
         this.runtime.setFilterGain(idx, targetGain);
       }

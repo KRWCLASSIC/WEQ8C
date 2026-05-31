@@ -69,6 +69,11 @@ export class EQUIFilterRowElement extends LitElement {
       .chip.disabled:hover {
         background: #444444;
       }
+      :host(.drag-over) {
+        outline: 2px solid #00ffcc;
+        outline-offset: -2px;
+        border-radius: 22px;
+      }
       .filterNumber {
         cursor: pointer;
         width: 20px;
@@ -80,6 +85,12 @@ export class EQUIFilterRowElement extends LitElement {
         font-weight: var(--font-weight);
         color: black;
         transition: background-color 0.15s ease;
+      }
+      .filterNumber[draggable="true"] {
+        cursor: grab;
+      }
+      .filterNumber[draggable="true"]:active {
+        cursor: grabbing;
       }
       .chip.disabled .filterNumber {
         background: transparent;
@@ -191,17 +202,42 @@ export class EQUIFilterRowElement extends LitElement {
   render() {
     if (!this.runtime || this.index === undefined) return;
 
-    let typeOptions = TYPE_OPTIONS.filter((o) =>
-      this.runtime!.supportedFilterTypes.includes(o[0] as FilterType)
-    );
-
     let spec = this.runtime.spec[this.index];
+    const isNoop = spec.type === "noop";
+
+    let typeOptions = TYPE_OPTIONS.filter((o) => {
+      if (o[0] === "noop") return isNoop;
+      return this.runtime!.supportedFilterTypes.includes(o[0] as FilterType);
+    });
+
+    // Compute dynamic filter recommendations based on active bands
+    const activeIndices = this.runtime.spec
+      .map((s, idx) => s.type !== "noop" ? idx : -1)
+      .filter(idx => idx !== -1);
+
+    let firstActiveIdx = 0;
+    let lastActiveIdx = 7;
+
+    if (activeIndices.length > 0) {
+      firstActiveIdx = activeIndices[0];
+      lastActiveIdx = activeIndices[activeIndices.length - 1];
+    }
+
+    let recType: FilterType | "noop" = "peaking12";
+    if (this.index === 0 || this.index === firstActiveIdx) {
+      // First filter and first active band always suggest LS12
+      recType = "lowshelf12";
+    } else if (this.index >= lastActiveIdx) {
+      // Last active band and any band after it suggest HS12
+      recType = "highshelf12";
+    }
+
     return html`
       <th>
         <div
           class=${classMap({
             chip: true,
-            disabled: !filterHasFrequency(spec.type),
+            disabled: isNoop,
             bypassed: spec.bypass,
           })}
         >
@@ -209,23 +245,73 @@ export class EQUIFilterRowElement extends LitElement {
             class=${classMap({
               filterNumber: true,
               bypassed: spec.bypass,
+              disabled: isNoop,
             })}
-            @click=${() => this.toggleBypass()}
+            draggable=${isNoop ? 'false' : 'true'}
+            @click=${() => {
+              if (isNoop) {
+                this.setFilterType(recType);
+              } else {
+                this.toggleBypass();
+              }
+            }}
+            @contextmenu=${(evt: MouseEvent) => {
+              if (!isNoop) {
+                evt.preventDefault();
+                this.setFilterType("noop");
+              }
+            }}
+            @dragstart=${(evt: DragEvent) => {
+              if (isNoop) { evt.preventDefault(); return; }
+              evt.dataTransfer!.effectAllowed = 'move';
+              this.dispatchEvent(new CustomEvent('band-drag-start', {
+                detail: { index: this.index },
+                bubbles: true, composed: true,
+              }));
+            }}
+            @dragover=${(evt: DragEvent) => {
+              evt.preventDefault();
+              evt.dataTransfer!.dropEffect = 'move';
+              this.dispatchEvent(new CustomEvent('band-drag-over', {
+                detail: { index: this.index },
+                bubbles: true, composed: true,
+              }));
+            }}
+            @dragleave=${() => {
+              this.dispatchEvent(new CustomEvent('band-drag-leave', {
+                detail: { index: this.index },
+                bubbles: true, composed: true,
+              }));
+            }}
+            @drop=${(evt: DragEvent) => {
+              evt.preventDefault();
+              this.dispatchEvent(new CustomEvent('band-drop', {
+                detail: { index: this.index },
+                bubbles: true, composed: true,
+              }));
+            }}
+            title=${isNoop ? "Click to Add Band" : "Click to Toggle Bypass / Right-click to Remove | Drag to reorder"}
           >
             ${this.index + 1}
           </div>
-          <select
-            class=${classMap({ filterTypeSelect: true, bypassed: spec.bypass })}
-            @change=${(evt: { target: HTMLSelectElement }) =>
-              this.setFilterType(evt.target.value as FilterType | "noop")}
-          >
-            ${typeOptions.map(
-              ([type, label]) =>
-                html`<option value=${type} ?selected=${spec.type === type}>
-                  ${label}
-                </option>`
-            )}
-          </select>
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 30px; height: 20px;">
+            <span style="color: ${spec.bypass ? '#7d7d7d' : 'white'}; font-family: var(--font-stack); font-size: var(--font-size); font-weight: var(--font-weight); pointer-events: none; text-align: center; white-space: nowrap;">
+              ${TYPE_OPTIONS.find(o => o[0] === spec.type)?.[1] ?? spec.type}
+            </span>
+            <select
+              class=${classMap({ filterTypeSelect: true, bypassed: spec.bypass })}
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;"
+              @change=${(evt: { target: HTMLSelectElement }) =>
+                this.setFilterType(evt.target.value as FilterType | "noop")}
+            >
+              ${typeOptions.map(([type, label]) => {
+                const displayLabel = type === recType ? `${label} ★` : label;
+                return html`<option value=${type} ?selected=${spec.type === type}>
+                  ${displayLabel}
+                </option>`;
+              })}
+            </select>
+          </div>
         </div>
       </th>
       <td>
@@ -267,56 +353,61 @@ export class EQUIFilterRowElement extends LitElement {
         >
       </td>
       <td>
-        <input
-          class=${classMap({
-            gainInput: true,
-            numberInput: true,
-            bypassed: spec.bypass,
-          })}
-          type="number"
-          min="-15"
-          max="15"
-          step="0.1"
-          lang="en_EN"
-          .value=${spec.gain.toFixed(1)}
-          ?disabled=${!filterHasGain(spec.type)}
-          @input=${(evt: { target: HTMLInputElement }) =>
-            this.setFilterGain(evt.target.valueAsNumber)}
-          @pointerdown=${(evt: PointerEvent) =>
-            this.startDraggingValue(evt, "gain")}
-          @pointerup=${(evt: PointerEvent) =>
-            this.stopDraggingValue(evt, "gain")}
-          @pointermove=${(evt: PointerEvent) => this.dragValue(evt, "gain")}
-        />
-        <span
-          class=${classMap({
-            gainUnit: true,
-            disabled: !filterHasGain(spec.type),
-            bypassed: spec.bypass,
-          })}
-          >dB</span
-        >
+        ${filterHasGain(spec.type) ? html`
+          <input
+            class=${classMap({
+              gainInput: true,
+              numberInput: true,
+              bypassed: spec.bypass,
+            })}
+            type="number"
+            min="-15"
+            max="15"
+            step="0.1"
+            lang="en_EN"
+            .value=${spec.gain.toFixed(1)}
+            @input=${(evt: { target: HTMLInputElement }) =>
+              this.setFilterGain(evt.target.valueAsNumber)}
+            @pointerdown=${(evt: PointerEvent) =>
+              this.startDraggingValue(evt, "gain")}
+            @pointerup=${(evt: PointerEvent) =>
+              this.stopDraggingValue(evt, "gain")}
+            @pointermove=${(evt: PointerEvent) => this.dragValue(evt, "gain")}
+          />
+          <span
+            class=${classMap({
+              gainUnit: true,
+              bypassed: spec.bypass,
+            })}
+            >dB</span
+          >
+        ` : html`
+          <span class="disabled bypassed" style="font-family: var(--font-stack); font-size: var(--font-size); font-weight: var(--font-weight); display: block; text-align: right; width: 26px; line-height: 20px; color: #7d7d7d; cursor: not-allowed; user-select: none;">--</span>
+        `}
       </td>
       <td>
-        <input
-          class=${classMap({
-            qInput: true,
-            numberInput: true,
-            bypassed: spec.bypass,
-          })}
-          type="number"
-          min="0.1"
-          max="18"
-          step="0.1"
-          .value=${spec.Q.toFixed(2)}
-          ?disabled=${!filterHasQ(spec.type)}
-          @input=${(evt: { target: HTMLInputElement }) =>
-            this.setFilterQ(evt.target.valueAsNumber)}
-          @pointerdown=${(evt: PointerEvent) =>
-            this.startDraggingValue(evt, "Q")}
-          @pointerup=${(evt: PointerEvent) => this.stopDraggingValue(evt, "Q")}
-          @pointermove=${(evt: PointerEvent) => this.dragValue(evt, "Q")}
-        />
+        ${filterHasQ(spec.type) ? html`
+          <input
+            class=${classMap({
+              qInput: true,
+              numberInput: true,
+              bypassed: spec.bypass,
+            })}
+            type="number"
+            min="0.1"
+            max="18"
+            step="0.1"
+            .value=${spec.Q.toFixed(2)}
+            @input=${(evt: { target: HTMLInputElement }) =>
+              this.setFilterQ(evt.target.valueAsNumber)}
+            @pointerdown=${(evt: PointerEvent) =>
+              this.startDraggingValue(evt, "Q")}
+            @pointerup=${(evt: PointerEvent) => this.stopDraggingValue(evt, "Q")}
+            @pointermove=${(evt: PointerEvent) => this.dragValue(evt, "Q")}
+          />
+        ` : html`
+          <span class="disabled bypassed" style="font-family: var(--font-stack); font-size: var(--font-size); font-weight: var(--font-weight); display: block; text-align: right; width: 30px; line-height: 20px; color: #7d7d7d; cursor: not-allowed; user-select: none;">--</span>
+        `}
       </td>
     `;
   }
