@@ -1,4 +1,4 @@
-# WEQ8C `0.3.2`
+# WEQ8C `0.3.3`
 
 [![NPM](https://nodei.co/npm/weq8c.png?compact=true)](https://npmjs.org/package/weq8c)
 
