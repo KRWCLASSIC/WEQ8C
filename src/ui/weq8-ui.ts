@@ -86,6 +86,12 @@ export class WEQ8UIElement extends LitElement {
         position: relative;
         border: 1px solid #373737;
       }
+      .curve-probe-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+      }
       canvas,
       svg {
         position: absolute;
@@ -152,16 +158,24 @@ export class WEQ8UIElement extends LitElement {
         position: absolute;
         width: 8px;
         height: 8px;
-        margin: -4px 0 0 -4px;
+        transform: translate(-50%, -50%);
         border-radius: 50%;
         background: #ffcc00;
         border: 1px solid #202020;
+        pointer-events: none;
+        z-index: 4;
+      }
+      .curve-probe-anchor {
+        position: absolute;
+        width: 0;
+        height: 0;
+        transform: translate(-50%, -50%);
         pointer-events: none;
         z-index: 2;
       }
       .curve-probe-stats {
         position: absolute;
-        z-index: 3;
+        z-index: 2;
         pointer-events: none;
         display: grid;
         gap: 2px;
@@ -173,6 +187,27 @@ export class WEQ8UIElement extends LitElement {
         font-weight: var(--font-weight);
         line-height: 1.3;
         white-space: nowrap;
+        box-sizing: border-box;
+      }
+      .curve-probe-stats.placement-below {
+        left: 50%;
+        top: 16px;
+        transform: translateX(-50%);
+      }
+      .curve-probe-stats.placement-above {
+        left: 50%;
+        bottom: 16px;
+        transform: translateX(-50%);
+      }
+      .curve-probe-stats.placement-right {
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      .curve-probe-stats.placement-left {
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
       }
       .curve-probe-stats .probe-row {
         display: grid;
@@ -374,7 +409,9 @@ export class WEQ8UIElement extends LitElement {
           class="frequencyResponse"
           @click=${() => (this.selectedFilterIdx = -1)}
         ></canvas>
-        ${this.curveProbe ? this.renderCurveProbe() : null}
+        <div class="curve-probe-layer">
+          ${this.curveProbe ? this.renderCurveProbe() : null}
+        </div>
         ${this.runtime?.spec.map((s, i) =>
           s.type === "noop" ? undefined : this.renderFilterHandle(s, i)
         )}
@@ -511,15 +548,71 @@ export class WEQ8UIElement extends LitElement {
     };
   };
 
+  /** Anchor stats to the dot with equal gap (markerR + gap) on every side. */
+  private getProbeLayout(p: CurveProbe) {
+    const w = this.frequencyResponseCanvas?.offsetWidth ?? 0;
+    const h = this.frequencyResponseCanvas?.offsetHeight ?? 0;
+    const edge = 8;
+    const gap = 12;
+    const markerR = 4;
+    const offset = markerR + gap;
+    const statsW = 118;
+    const statsH = 58;
+    const dotInset = 0.45;
+
+    const markerX = clamp(p.xPercent, dotInset, 100 - dotInset);
+    const markerY = clamp(p.curveYPercent, dotInset, 100 - dotInset);
+    const mx = (p.xPercent / 100) * w;
+    const my = (p.curveYPercent / 100) * h;
+
+    const canAbove = my - offset - statsH >= edge;
+    const canBelow = my + offset + statsH <= h - edge;
+    const canRight = mx + offset + statsW <= w - edge;
+    const canLeft = mx - offset - statsW >= edge;
+
+    type Placement = "above" | "below" | "left" | "right";
+    let placement: Placement;
+
+    if (canAbove || canBelow) {
+      const spaceAbove = my - edge;
+      const spaceBelow = h - edge - my;
+      if (canAbove && canBelow) {
+        placement = spaceAbove >= spaceBelow ? "above" : "below";
+      } else {
+        placement = canAbove ? "above" : "below";
+      }
+    } else if (canRight || canLeft) {
+      placement = canRight && (!canLeft || mx < w / 2) ? "right" : "left";
+    } else {
+      placement = my < h / 2 ? "below" : "above";
+    }
+
+    let anchorX = mx;
+    if (placement === "above" || placement === "below") {
+      const half = statsW / 2;
+      anchorX = clamp(anchorX, edge + half, w - edge - half);
+    }
+
+    let anchorY = my;
+    if (placement === "left" || placement === "right") {
+      const half = statsH / 2;
+      anchorY = clamp(anchorY, edge + half, h - edge - half);
+    }
+
+    return {
+      markerX,
+      markerY,
+      anchorLeft: `${anchorX}px`,
+      anchorTop: `${anchorY}px`,
+      placement,
+    };
+  }
+
   private renderCurveProbe() {
     const p = this.curveProbe!;
+    const layout = this.getProbeLayout(p);
     const y1 = p.fromTop ? 0 : 100;
-    const y2 = p.curveYPercent;
     const dbSign = p.magnitudeDb >= 0 ? "+" : "";
-    const statsTransform =
-      p.curveYPercent < 18
-        ? "translate(-50%, 8px)"
-        : "translate(-50%, calc(-100% - 6px))";
     return html`
       <svg
         class="curve-probe-overlay"
@@ -528,20 +621,21 @@ export class WEQ8UIElement extends LitElement {
       >
         <line
           class="curve-probe-line"
-          x1=${p.xPercent}
+          x1=${layout.markerX}
           y1=${y1}
-          x2=${p.xPercent}
-          y2=${y2}
+          x2=${layout.markerX}
+          y2=${layout.markerY}
         />
       </svg>
       <div
         class="curve-probe-marker"
-        style="left: ${p.xPercent}%; top: ${p.curveYPercent}%;"
+        style="left: ${layout.markerX}%; top: ${layout.markerY}%;"
       ></div>
       <div
-        class="curve-probe-stats"
-        style="left: ${p.xPercent}%; top: ${p.curveYPercent}%; transform: ${statsTransform};"
+        class="curve-probe-anchor"
+        style="left: ${layout.anchorLeft}; top: ${layout.anchorTop};"
       >
+        <div class="curve-probe-stats placement-${layout.placement}">
         <div class="probe-row">
           <span class="probe-label">Freq</span>
           <span class="probe-value"
@@ -560,6 +654,7 @@ export class WEQ8UIElement extends LitElement {
           <span class="probe-value" style="color: #7d7d7d;"
             >${p.phaseDeg.toFixed(1)}°</span
           >
+        </div>
         </div>
       </div>
     `;
@@ -603,7 +698,7 @@ export class WEQ8UIElement extends LitElement {
   private updateCurveProbeFromPointer(evt: PointerEvent) {
     if (!this.runtime) return;
     const bounds = this.getVisualisationBounds();
-    if (bounds.width <= 0) return;
+    if (bounds.width <= 0 || bounds.height <= 0) return;
 
     const relX = clamp((evt.clientX - bounds.left) / bounds.width, 0, 1);
     const frequency = toLin(relX, 10, this.runtime.audioCtx.sampleRate / 2);
