@@ -6,7 +6,29 @@ import { WEQ8Filter } from "../spec";
 import { WEQ8Analyser } from "./WEQ8Analyser";
 import { WEQ8FrequencyResponse } from "./WEQ8FrequencyResponse";
 import { sharedStyles } from "./styles";
-import { clamp, filterHasGain, filterHasQ, toLin, toLog10 } from "../functions";
+import {
+  clamp,
+  filterHasGain,
+  filterHasQ,
+  formatFrequency,
+  formatFrequencyUnit,
+  getActiveBandDisplayNumber,
+  toLin,
+  toLog10,
+} from "../functions";
+
+/** Matches WEQ8FrequencyResponse canvas vertical scale. */
+const CURVE_MIN_DB = -13;
+const CURVE_MAX_DB = 13;
+
+type CurveProbe = {
+  xPercent: number;
+  curveYPercent: number;
+  fromTop: boolean;
+  frequency: number;
+  magnitudeDb: number;
+  phaseDeg: number;
+};
 
 import "./weq8-ui-filter-row";
 import "./weq8-ui-filter-hud";
@@ -17,6 +39,7 @@ export class WEQ8UIElement extends LitElement {
     sharedStyles,
     css`
       :host {
+        position: relative;
         display: flex;
         flex-direction: row;
         align-items: stretch;
@@ -111,6 +134,90 @@ export class WEQ8UIElement extends LitElement {
       .filter-handle.bypassed {
         background: #7d7d7d;
       }
+      .curve-probe-overlay {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .curve-probe-line {
+        stroke: #7d7d7d;
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+        vector-effect: non-scaling-stroke;
+      }
+      .curve-probe-marker {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        margin: -4px 0 0 -4px;
+        border-radius: 50%;
+        background: #ffcc00;
+        border: 1px solid #202020;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .curve-probe-stats {
+        position: absolute;
+        z-index: 3;
+        pointer-events: none;
+        display: grid;
+        gap: 2px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: #373737;
+        font-family: var(--font-stack);
+        font-size: var(--font-size);
+        font-weight: var(--font-weight);
+        line-height: 1.3;
+        white-space: nowrap;
+      }
+      .curve-probe-stats .probe-row {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 6px;
+        align-items: baseline;
+      }
+      .curve-probe-stats .probe-label {
+        color: #7d7d7d;
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .curve-probe-stats .probe-value {
+        color: white;
+        text-align: right;
+      }
+      .curve-probe-stats .probe-db {
+        color: #ffcc00;
+        font-weight: var(--font-weight);
+      }
+      .eq-context-menu {
+        position: absolute;
+        z-index: 10;
+        min-width: 148px;
+        padding: 4px 0;
+        border-radius: 10px;
+        background: #373737;
+        border: 1px solid #373737;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+        pointer-events: auto;
+      }
+      .eq-context-menu-item {
+        padding: 7px 12px;
+        font-family: var(--font-stack);
+        font-size: var(--font-size);
+        font-weight: var(--font-weight);
+        color: #7d7d7d;
+        cursor: default;
+        user-select: none;
+      }
+      .eq-context-menu-item strong {
+        color: white;
+        font-weight: var(--font-weight);
+      }
     `,
   ];
 
@@ -134,7 +241,25 @@ export class WEQ8UIElement extends LitElement {
     this.addEventListener("click", (evt) => {
       if (evt.composedPath()[0] === this) this.selectedFilterIdx = -1;
     });
+    this.addEventListener("contextmenu", this.onHostContextMenu);
   }
+
+  connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener("pointerdown", this.onDocumentPointerDown, true);
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("pointerdown", this.onDocumentPointerDown, true);
+    super.disconnectedCallback();
+  }
+
+  private onDocumentPointerDown = (evt: PointerEvent) => {
+    if (!this.curveContextMenu) return;
+    const menu = this.renderRoot.querySelector(".eq-context-menu");
+    if (menu && evt.composedPath().includes(menu)) return;
+    this.curveContextMenu = null;
+  };
 
   @property({ attribute: false })
   runtime?: WEQ8Runtime;
@@ -162,6 +287,14 @@ export class WEQ8UIElement extends LitElement {
 
   @state()
   private dragOverIdx = -1;
+
+  @state()
+  private curveProbe: CurveProbe | null = null;
+
+  private curveProbePointerId: number | null = null;
+
+  @state()
+  private curveContextMenu: { x: number; y: number } | null = null;
 
   @query(".analyser")
   private analyserCanvas?: HTMLCanvasElement;
@@ -199,6 +332,9 @@ export class WEQ8UIElement extends LitElement {
 
         this.runtime.on("filtersChanged", () => {
           this.frequencyResponse?.render();
+          if (this.curveProbe) {
+            this.refreshCurveProbeAtFrequency(this.curveProbe.frequency);
+          }
           this.requestUpdate();
           for (let row of Array.from(
             this.shadowRoot?.querySelectorAll("weq8-ui-filter-row") ?? []
@@ -216,7 +352,15 @@ export class WEQ8UIElement extends LitElement {
   render() {
     return html`
       ${this.view === "allBands" ? this.renderTable() : null}
-      <div class="visualisation" @wheel=${(evt: WheelEvent) => evt.preventDefault()}>
+      <div
+        class="visualisation"
+        @wheel=${(evt: WheelEvent) => evt.preventDefault()}
+        @contextmenu=${this.onVisualisationContextMenu}
+        @pointerdown=${this.onVisualisationPointerDown}
+        @pointermove=${this.onVisualisationPointerMove}
+        @pointerup=${this.onVisualisationPointerUp}
+        @pointercancel=${this.onVisualisationPointerUp}
+      >
         <svg
           viewBox="0 0 100 10"
           preserveAspectRatio="none"
@@ -230,6 +374,7 @@ export class WEQ8UIElement extends LitElement {
           class="frequencyResponse"
           @click=${() => (this.selectedFilterIdx = -1)}
         ></canvas>
+        ${this.curveProbe ? this.renderCurveProbe() : null}
         ${this.runtime?.spec.map((s, i) =>
           s.type === "noop" ? undefined : this.renderFilterHandle(s, i)
         )}
@@ -237,6 +382,7 @@ export class WEQ8UIElement extends LitElement {
           ? this.renderFilterHUD()
           : null}
       </div>
+      ${this.curveContextMenu ? this.renderEqContextMenu() : null}
     `;
   }
 
@@ -309,6 +455,196 @@ export class WEQ8UIElement extends LitElement {
     }
   }
 
+  private renderEqContextMenu() {
+    const m = this.curveContextMenu!;
+    return html`
+      <div
+        class="eq-context-menu"
+        style="left: ${m.x}px; top: ${m.y}px;"
+        @contextmenu=${(evt: MouseEvent) => evt.preventDefault()}
+      >
+        <div class="eq-context-menu-item">
+          <strong>WEQ8C</strong> v${WEQ8Runtime.version}
+        </div>
+      </div>
+    `;
+  }
+
+  private isInsideVisualisation(path: EventTarget[]) {
+    const viz = this.renderRoot.querySelector(".visualisation");
+    return viz ? path.includes(viz) : false;
+  }
+
+  private isActiveBandNumberContextMenu(path: EventTarget[]) {
+    for (const el of path) {
+      if (
+        el instanceof HTMLElement &&
+        el.classList.contains("filterNumber") &&
+        el.getAttribute("draggable") === "true"
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private onHostContextMenu = (evt: MouseEvent) => {
+    const path = evt.composedPath();
+
+    if (this.isInsideVisualisation(path)) {
+      return;
+    }
+
+    if (this.isActiveBandNumberContextMenu(path)) {
+      return;
+    }
+
+    evt.preventDefault();
+    evt.stopPropagation();
+
+    const rect = this.getBoundingClientRect();
+    const menuW = 148;
+    const menuH = 32;
+    this.curveContextMenu = {
+      x: clamp(evt.clientX - rect.left, 4, Math.max(4, rect.width - menuW - 4)),
+      y: clamp(evt.clientY - rect.top, 4, Math.max(4, rect.height - menuH - 4)),
+    };
+  };
+
+  private renderCurveProbe() {
+    const p = this.curveProbe!;
+    const y1 = p.fromTop ? 0 : 100;
+    const y2 = p.curveYPercent;
+    const dbSign = p.magnitudeDb >= 0 ? "+" : "";
+    const statsTransform =
+      p.curveYPercent < 18
+        ? "translate(-50%, 8px)"
+        : "translate(-50%, calc(-100% - 6px))";
+    return html`
+      <svg
+        class="curve-probe-overlay"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <line
+          class="curve-probe-line"
+          x1=${p.xPercent}
+          y1=${y1}
+          x2=${p.xPercent}
+          y2=${y2}
+        />
+      </svg>
+      <div
+        class="curve-probe-marker"
+        style="left: ${p.xPercent}%; top: ${p.curveYPercent}%;"
+      ></div>
+      <div
+        class="curve-probe-stats"
+        style="left: ${p.xPercent}%; top: ${p.curveYPercent}%; transform: ${statsTransform};"
+      >
+        <div class="probe-row">
+          <span class="probe-label">Freq</span>
+          <span class="probe-value"
+            >${formatFrequency(p.frequency)}
+            ${formatFrequencyUnit(p.frequency)}</span
+          >
+        </div>
+        <div class="probe-row">
+          <span class="probe-label">Gain</span>
+          <span class="probe-value probe-db"
+            >${dbSign}${p.magnitudeDb.toFixed(2)} dB</span
+          >
+        </div>
+        <div class="probe-row">
+          <span class="probe-label">Phase</span>
+          <span class="probe-value" style="color: #7d7d7d;"
+            >${p.phaseDeg.toFixed(1)}°</span
+          >
+        </div>
+      </div>
+    `;
+  }
+
+  private getVisualisationBounds() {
+    return (
+      this.frequencyResponseCanvas?.getBoundingClientRect() ?? {
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 0,
+      }
+    );
+  }
+
+  private refreshCurveProbeAtFrequency(frequency: number) {
+    if (!this.runtime) return;
+    const bounds = this.getVisualisationBounds();
+    if (bounds.width <= 0) return;
+
+    const nyquist = this.runtime.audioCtx.sampleRate / 2;
+    const xPercent =
+      toLog10(frequency, 10, nyquist) * 100;
+    const { magnitudeDb, phaseDeg } =
+      this.runtime.getEqResponseAtFrequency(frequency);
+    const relY =
+      (magnitudeDb - CURVE_MIN_DB) / (CURVE_MAX_DB - CURVE_MIN_DB);
+    const curveYPercent = clamp((1 - relY) * 100, 0, 100);
+
+    this.curveProbe = {
+      xPercent,
+      curveYPercent,
+      fromTop: magnitudeDb < 0,
+      frequency,
+      magnitudeDb,
+      phaseDeg,
+    };
+  }
+
+  private updateCurveProbeFromPointer(evt: PointerEvent) {
+    if (!this.runtime) return;
+    const bounds = this.getVisualisationBounds();
+    if (bounds.width <= 0) return;
+
+    const relX = clamp((evt.clientX - bounds.left) / bounds.width, 0, 1);
+    const frequency = toLin(relX, 10, this.runtime.audioCtx.sampleRate / 2);
+    this.refreshCurveProbeAtFrequency(frequency);
+  }
+
+  private onVisualisationContextMenu = (evt: MouseEvent) => {
+    const target = evt.target as HTMLElement;
+    if (target.closest(".filter-handle-positioner")) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+  };
+
+  private onVisualisationPointerDown = (evt: PointerEvent) => {
+    if (evt.button !== 2 || !this.runtime) return;
+    const target = evt.target as HTMLElement;
+    if (target.closest(".filter-handle-positioner")) return;
+
+    this.curveContextMenu = null;
+
+    evt.preventDefault();
+    (evt.currentTarget as HTMLElement).setPointerCapture(evt.pointerId);
+    this.curveProbePointerId = evt.pointerId;
+    this.updateCurveProbeFromPointer(evt);
+  };
+
+  private onVisualisationPointerMove = (evt: PointerEvent) => {
+    if (this.curveProbePointerId !== evt.pointerId) return;
+    this.updateCurveProbeFromPointer(evt);
+  };
+
+  private onVisualisationPointerUp = (evt: PointerEvent) => {
+    if (this.curveProbePointerId !== evt.pointerId) return;
+    const target = evt.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(evt.pointerId)) {
+      target.releasePointerCapture(evt.pointerId);
+    }
+    this.curveProbePointerId = null;
+    this.curveProbe = null;
+  };
+
   private renderGridX(x: number) {
     return svg`<line
       class="grid-x"
@@ -350,8 +686,10 @@ export class WEQ8UIElement extends LitElement {
           bypassed: spec.bypass,
           selected: idx === this.selectedFilterIdx,
         })}"
+        @dblclick=${(evt: MouseEvent) =>
+          this.onFilterHandleDoubleClick(evt, idx, spec)}
       >
-        ${idx + 1}
+        ${getActiveBandDisplayNumber(this.runtime.spec, idx) ?? ""}
       </div>
     </div>`;
   }
@@ -367,6 +705,18 @@ export class WEQ8UIElement extends LitElement {
       y = height - toLog10(spec.Q, 0.1, 18) * height;
     }
     return [x, y];
+  }
+
+  private onFilterHandleDoubleClick(
+    evt: MouseEvent,
+    idx: number,
+    spec: WEQ8Filter
+  ) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (!this.runtime || !filterHasGain(spec.type)) return;
+    this.selectedFilterIdx = idx;
+    this.runtime.setFilterGain(idx, 0);
   }
 
   private startDraggingFilterHandle(evt: PointerEvent, idx: number) {

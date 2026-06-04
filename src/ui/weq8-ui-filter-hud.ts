@@ -8,8 +8,10 @@ import {
   filterHasFrequency,
   filterHasGain,
   filterHasQ,
+  formatFilterTypeOptionLabel,
   formatFrequency,
   formatFrequencyUnit,
+  getRecommendedFilterType,
   toLin,
   toLog10,
 } from "../functions";
@@ -171,6 +173,7 @@ export class EQUIFilterHUDElement extends LitElement {
     );
 
     let spec = this.runtime.spec[this.index];
+    const recType = getRecommendedFilterType(this.runtime.spec, this.index);
 
     let x = (this.posOnDragStart?.x ?? this.x!) - 100;
     let y = (this.posOnDragStart?.y ?? this.y!) + 20;
@@ -197,7 +200,7 @@ export class EQUIFilterHUDElement extends LitElement {
               ${typeOptions.map(
                 ([type, label]) =>
                   html`<option value=${type} ?selected=${spec.type === type}>
-                    ${label}
+                    ${formatFilterTypeOptionLabel(label, type as FilterType, recType)}
                   </option>`
               )}
             </select>

@@ -1,4 +1,60 @@
-import { FilterType } from "./spec";
+import { FilterType, WEQ8Filter } from "./spec";
+
+export function isActiveBand(spec: WEQ8Filter): boolean {
+  return spec.type !== "noop";
+}
+
+/** 1-based label among active bands only; null for empty (noop) slots. */
+export function getActiveBandDisplayNumber(
+  spec: readonly WEQ8Filter[],
+  slotIndex: number
+): number | null {
+  if (
+    slotIndex < 0 ||
+    slotIndex >= spec.length ||
+    !isActiveBand(spec[slotIndex])
+  ) {
+    return null;
+  }
+  let n = 0;
+  for (let i = 0; i <= slotIndex; i++) {
+    if (isActiveBand(spec[i])) n++;
+  }
+  return n;
+}
+
+/** Suggested filter type for a slot from band layout (LS / PK / HS). */
+export function getRecommendedFilterType(
+  spec: readonly WEQ8Filter[],
+  slotIndex: number
+): FilterType {
+  const activeIndices = spec
+    .map((s, idx) => (s.type !== "noop" ? idx : -1))
+    .filter((idx) => idx !== -1);
+
+  let firstActiveIdx = 0;
+  let lastActiveIdx = 7;
+  if (activeIndices.length > 0) {
+    firstActiveIdx = activeIndices[0];
+    lastActiveIdx = activeIndices[activeIndices.length - 1];
+  }
+
+  if (slotIndex === 0 || slotIndex === firstActiveIdx) {
+    return "lowshelf12";
+  }
+  if (slotIndex >= lastActiveIdx) {
+    return "highshelf12";
+  }
+  return "peaking12";
+}
+
+export function formatFilterTypeOptionLabel(
+  label: string,
+  type: FilterType,
+  recommendedType: FilterType
+): string {
+  return type === recommendedType ? `${label} ★` : label;
+}
 
 export function filterHasGain(type: FilterType | "noop"): boolean {
   return (

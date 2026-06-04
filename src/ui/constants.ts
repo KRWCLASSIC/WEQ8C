@@ -1,7 +1,7 @@
 import { FilterType } from "src/spec";
 
 export const TYPE_OPTIONS: [FilterType | "noop", string][] = [
-  ["noop", "Add +"],
+  ["noop", "Add"],
   ["lowpass12", "LP12"],
   ["lowpass24", "LP24"],
   ["highpass12", "HP12"],

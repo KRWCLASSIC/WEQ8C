@@ -10,6 +10,9 @@ import {
   filterHasQ,
   formatFrequency,
   formatFrequencyUnit,
+  formatFilterTypeOptionLabel,
+  getActiveBandDisplayNumber,
+  getRecommendedFilterType,
   toLin,
   toLog10,
 } from "../functions";
@@ -70,7 +73,8 @@ export class EQUIFilterRowElement extends LitElement {
         background: #444444;
       }
       :host(.drag-over) {
-        outline: 2px solid #00ffcc;
+        background-color: #373737;
+        outline: 1px solid #ffcc00;
         outline-offset: -2px;
         border-radius: 22px;
       }
@@ -94,7 +98,20 @@ export class EQUIFilterRowElement extends LitElement {
       }
       .chip.disabled .filterNumber {
         background: transparent;
+        color: #7d7d7d;
+        border: 0.5px solid #444444;
+        box-sizing: border-box;
+      }
+      .chip.disabled:hover .filterNumber {
         color: white;
+        border-color: #5a5a5a;
+      }
+      .powerIcon {
+        display: block;
+        line-height: 0;
+      }
+      .powerIcon svg {
+        display: block;
       }
       .chip.bypassed .filterNumber {
         background: #7d7d7d;
@@ -119,8 +136,28 @@ export class EQUIFilterRowElement extends LitElement {
       .filterTypeSelect.bypassed {
         color: #7d7d7d;
       }
-      .chip.disabled .filterTypeSelect {
+      .chipType {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 20px;
+        box-sizing: border-box;
+      }
+      .addBandLabel {
+        cursor: pointer;
         pointer-events: all;
+        font-family: var(--font-stack);
+        font-size: var(--font-size);
+        font-weight: var(--font-weight);
+        color: #7d7d7d;
+        text-align: center;
+        white-space: nowrap;
+        user-select: none;
+      }
+      .chip.disabled:hover .addBandLabel {
+        color: white;
       }
       .frequencyInput {
         width: 28px;
@@ -181,7 +218,46 @@ export class EQUIFilterRowElement extends LitElement {
         new CustomEvent("select", { composed: true, bubbles: true })
       )
     );
+    this.addEventListener("dragover", this.onBandDragOver);
+    this.addEventListener("dragleave", this.onBandDragLeave);
+    this.addEventListener("drop", this.onBandDrop);
   }
+
+  private onBandDragOver = (evt: DragEvent) => {
+    if (this.index === undefined) return;
+    evt.preventDefault();
+    if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
+    this.dispatchEvent(
+      new CustomEvent("band-drag-over", {
+        detail: { index: this.index },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  private onBandDragLeave = () => {
+    if (this.index === undefined) return;
+    this.dispatchEvent(
+      new CustomEvent("band-drag-leave", {
+        detail: { index: this.index },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  private onBandDrop = (evt: DragEvent) => {
+    if (this.index === undefined) return;
+    evt.preventDefault();
+    this.dispatchEvent(
+      new CustomEvent("band-drop", {
+        detail: { index: this.index },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   @property({ attribute: false })
   runtime?: WEQ8Runtime;
@@ -205,32 +281,18 @@ export class EQUIFilterRowElement extends LitElement {
     let spec = this.runtime.spec[this.index];
     const isNoop = spec.type === "noop";
 
-    let typeOptions = TYPE_OPTIONS.filter((o) => {
-      if (o[0] === "noop") return isNoop;
-      return this.runtime!.supportedFilterTypes.includes(o[0] as FilterType);
-    });
+    let typeOptions = TYPE_OPTIONS.filter(
+      (o) =>
+        o[0] !== "noop" &&
+        this.runtime!.supportedFilterTypes.includes(o[0] as FilterType)
+    );
 
-    // Compute dynamic filter recommendations based on active bands
-    const activeIndices = this.runtime.spec
-      .map((s, idx) => s.type !== "noop" ? idx : -1)
-      .filter(idx => idx !== -1);
+    const displayNumber = getActiveBandDisplayNumber(
+      this.runtime.spec,
+      this.index
+    );
 
-    let firstActiveIdx = 0;
-    let lastActiveIdx = 7;
-
-    if (activeIndices.length > 0) {
-      firstActiveIdx = activeIndices[0];
-      lastActiveIdx = activeIndices[activeIndices.length - 1];
-    }
-
-    let recType: FilterType | "noop" = "peaking12";
-    if (this.index === 0 || this.index === firstActiveIdx) {
-      // First filter and first active band always suggest LS12
-      recType = "lowshelf12";
-    } else if (this.index >= lastActiveIdx) {
-      // Last active band and any band after it suggest HS12
-      recType = "highshelf12";
-    }
+    const recType = getRecommendedFilterType(this.runtime.spec, this.index);
 
     return html`
       <th>
@@ -245,7 +307,6 @@ export class EQUIFilterRowElement extends LitElement {
             class=${classMap({
               filterNumber: true,
               bypassed: spec.bypass,
-              disabled: isNoop,
             })}
             draggable=${isNoop ? 'false' : 'true'}
             @click=${() => {
@@ -258,6 +319,7 @@ export class EQUIFilterRowElement extends LitElement {
             @contextmenu=${(evt: MouseEvent) => {
               if (!isNoop) {
                 evt.preventDefault();
+                evt.stopPropagation();
                 this.setFilterType("noop");
               }
             }}
@@ -269,48 +331,57 @@ export class EQUIFilterRowElement extends LitElement {
                 bubbles: true, composed: true,
               }));
             }}
-            @dragover=${(evt: DragEvent) => {
-              evt.preventDefault();
-              evt.dataTransfer!.dropEffect = 'move';
-              this.dispatchEvent(new CustomEvent('band-drag-over', {
-                detail: { index: this.index },
-                bubbles: true, composed: true,
-              }));
-            }}
-            @dragleave=${() => {
-              this.dispatchEvent(new CustomEvent('band-drag-leave', {
-                detail: { index: this.index },
-                bubbles: true, composed: true,
-              }));
-            }}
-            @drop=${(evt: DragEvent) => {
-              evt.preventDefault();
-              this.dispatchEvent(new CustomEvent('band-drop', {
-                detail: { index: this.index },
-                bubbles: true, composed: true,
-              }));
-            }}
             title=${isNoop ? "Click to Add Band" : "Click to Toggle Bypass / Right-click to Remove | Drag to reorder"}
           >
-            ${this.index + 1}
+            ${isNoop
+              ? html`<span class="powerIcon" aria-hidden="true"
+                  ><svg viewBox="0 -960 960 960" width="11" height="11" fill="currentColor"
+                    ><path
+                      d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-84 31.5-156.5T197-763l56 56q-44 44-68.5 102T160-480q0 134 93 227t227 93q134 0 227-93t93-227q0-67-24.5-125T707-707l56-56q54 54 85.5 126.5T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm-40-360v-440h80v440h-80Z"
+                    /></svg
+                  ></span>`
+              : displayNumber}
           </div>
-          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 30px; height: 20px;">
-            <span style="color: ${spec.bypass ? '#7d7d7d' : 'white'}; font-family: var(--font-stack); font-size: var(--font-size); font-weight: var(--font-weight); pointer-events: none; text-align: center; white-space: nowrap;">
-              ${TYPE_OPTIONS.find(o => o[0] === spec.type)?.[1] ?? spec.type}
-            </span>
-            <select
-              class=${classMap({ filterTypeSelect: true, bypassed: spec.bypass })}
-              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;"
-              @change=${(evt: { target: HTMLSelectElement }) =>
-                this.setFilterType(evt.target.value as FilterType | "noop")}
-            >
-              ${typeOptions.map(([type, label]) => {
-                const displayLabel = type === recType ? `${label} ★` : label;
-                return html`<option value=${type} ?selected=${spec.type === type}>
-                  ${displayLabel}
-                </option>`;
-              })}
-            </select>
+          <div class="chipType">
+            ${isNoop
+              ? html`<span
+                  class="addBandLabel"
+                  @click=${() => this.setFilterType(recType)}
+                  title="Add ${TYPE_OPTIONS.find((o) => o[0] === recType)?.[1] ?? recType}"
+                  >${TYPE_OPTIONS.find((o) => o[0] === "noop")?.[1] ?? "Add"}</span
+                >`
+              : html`
+                  <span
+                    style="color: ${spec.bypass
+                      ? "#7d7d7d"
+                      : "white"}; font-family: var(--font-stack); font-size: var(--font-size); font-weight: var(--font-weight); pointer-events: none; text-align: center; white-space: nowrap;"
+                  >
+                    ${TYPE_OPTIONS.find((o) => o[0] === spec.type)?.[1] ??
+                    spec.type}
+                  </span>
+                  <select
+                    class=${classMap({
+                      filterTypeSelect: true,
+                      bypassed: spec.bypass,
+                    })}
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0;"
+                    @change=${(evt: { target: HTMLSelectElement }) =>
+                      this.setFilterType(
+                        evt.target.value as FilterType | "noop"
+                      )}
+                    @click=${(evt: Event) => evt.stopPropagation()}
+                  >
+                    ${typeOptions.map(([type, label]) =>
+                      html`<option value=${type} ?selected=${spec.type === type}>
+                        ${formatFilterTypeOptionLabel(
+                          label,
+                          type as FilterType,
+                          recType
+                        )}
+                      </option>`
+                    )}
+                  </select>
+                `}
           </div>
         </div>
       </th>

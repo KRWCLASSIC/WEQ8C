@@ -627,10 +627,7 @@
       import { WEQ8Runtime } from "/src/main.ts";
       import { WEQ8UIElement, EQUIFilterRowElement } from "/src/ui/index.ts";
 
-      // Force-clear any cached pink/stale templates from localStorage
-      localStorage.removeItem("weq8c_custom_css");
-      
-      let savedCss = `/* Custom overrides for WEQ8 components */
+      const DEFAULT_CSS = `/* Custom overrides for WEQ8 components */
 
 * {
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
@@ -675,6 +672,10 @@
   color: #7d7d7d !important;
 }
 
+:host(.drag-over) {
+  outline: 1px solid #00ffcc;
+}
+
 .filters thead th {
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   font-size: 11px !important;
@@ -682,9 +683,12 @@
   color: #a0a0ab !important;
 }`;
 
-      document.getElementById("cssInput").value = savedCss;
-      WEQ8UIElement.addCustomStyles(savedCss);
-      EQUIFilterRowElement.addCustomStyles(savedCss);
+      const activeCss =
+        localStorage.getItem("weq8c_custom_css") ?? DEFAULT_CSS;
+
+      document.getElementById("cssInput").value = activeCss;
+      WEQ8UIElement.addCustomStyles(activeCss);
+      EQUIFilterRowElement.addCustomStyles(activeCss);
 
       document.getElementById("injectBtn").addEventListener("click", () => {
         const css = document.getElementById("cssInput").value;
@@ -693,7 +697,7 @@
       });
 
       document.getElementById("loadExampleBtn").addEventListener("click", () => {
-        document.getElementById("cssInput").value = savedCss;
+        document.getElementById("cssInput").value = DEFAULT_CSS;
       });
 
       // Audio setup

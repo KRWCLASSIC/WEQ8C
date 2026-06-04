@@ -154,11 +154,11 @@ export class WEQ8Runtime {
       !this.spec[idx].bypass
     ) {
       this.disconnectFilter(idx);
-    } else if (
-      type !== "noop" &&
-      this.spec[idx].type === "noop" &&
-      !this.spec[idx].bypass
-    ) {
+    }
+    if (type === "noop") {
+      this.spec[idx].bypass = false;
+    } else if (this.spec[idx].type === "noop") {
+      this.spec[idx].bypass = false;
       this.connectFilter(idx, type);
     }
     this.spec[idx].type = type;
@@ -285,6 +285,41 @@ export class WEQ8Runtime {
       }
     }
     this.emitter.emit("filtersChanged", this.spec);
+  }
+
+  getEqResponseAtFrequency(hz: number): {
+    magnitudeDb: number;
+    phaseDeg: number;
+  } {
+    const frequencies = new Float32Array([hz]);
+    const magResponse = new Float32Array(1);
+    const phaseResponse = new Float32Array(1);
+    let totalMag = 1;
+    let totalPhase = 0;
+
+    for (let i = 0; i < this.spec.length; i++) {
+      if (this.spec[i].type === "noop" || this.spec[i].bypass) continue;
+      const order = getBiquadFilterOrder(this.spec[i].type);
+      for (let j = 0; j < order; j++) {
+        if (
+          this.getFrequencyResponse(
+            i,
+            j,
+            frequencies,
+            magResponse,
+            phaseResponse
+          )
+        ) {
+          totalMag *= magResponse[0];
+          totalPhase += phaseResponse[0];
+        }
+      }
+    }
+
+    return {
+      magnitudeDb: totalMag > 0 ? 20 * Math.log10(totalMag) : -96,
+      phaseDeg: (totalPhase * 180) / Math.PI,
+    };
   }
 
   getFrequencyResponse(
